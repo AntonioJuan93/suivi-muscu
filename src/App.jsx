@@ -541,8 +541,6 @@ export default function App() {
         </div>
       )}
 
-      {tab==="log" && <RestTimer T={T} visible={showTimer} triggerKey={timerTrigger}/>}
-
       {/* Header */}
       <div style={{borderBottom:`1px solid ${T.border}`,background:T.bgCard,boxShadow:`0 1px 0 ${T.border}`}}>
         <div style={{maxWidth:680,margin:"0 auto",padding:"0 16px"}}>
@@ -580,9 +578,6 @@ export default function App() {
                   <button style={{...S.btnS,...(mode==="program"?{background:T.accentDim,color:T.accent,borderColor:T.accent}:{})}} onClick={()=>setMode("program")}>Programme</button>
                 </div>
               </div>
-              {exercises.length>0 && (
-                <button onClick={()=>setShowTimer(t=>!t)} style={{...S.btnS,...(showTimer?{background:T.accentDim,color:T.accent,borderColor:T.accent}:{}),padding:"7px 12px",fontSize:12,marginLeft:"auto"}}>⏱ Repos</button>
-              )}
             </div>
 
             {mode==="program"&&!selectedProgram&&(
@@ -602,8 +597,6 @@ export default function App() {
             {exercises.map(ex=>{
               const last=getLastForExercise(ex.name);
               const sugg=getSuggestion(ex.name, ex.target?.reps);
-              const lastSet=ex.sets[ex.sets.length-1];
-              const liveRest=lastSet?.addedAt ? formatRest(liveNow-lastSet.addedAt) : null;
               return (
                 <div key={ex.id} style={S.card}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
@@ -615,26 +608,40 @@ export default function App() {
                     <button onClick={()=>removeExercise(ex.id)} style={{...S.btnS,padding:"3px 8px",fontSize:11}}>✕</button>
                   </div>
 
-                  {/* Contexte dernière séance + suggestion */}
-                  <div style={{fontSize:11,marginBottom:10,padding:"8px 10px",background:T.bgInput,borderRadius:8}}>
-                    {last ? (
-                      <div style={{marginBottom:sugg?4:0,color:T.muted}}>
-                        🕐 {last.daysAgo===0?"Aujourd'hui":last.daysAgo===1?"Hier":`Il y a ${last.daysAgo}j`} : {last.sets.length} série{last.sets.length>1?"s":""} @ {last.maxWeight}kg
-                        {last.repsPerSet.length > 0 && ` (${last.repsPerSet.join(", ")} reps)`}
-                      </div>
-                    ) : (
-                      <div style={{color:T.muted}}>Premier enregistrement pour cet exercice</div>
-                    )}
-                    {sugg && (
-                      <div style={{marginTop:2}}>
-                        {sugg.type==="weight" && <span style={{color:T.accent,fontWeight:600}}>→ Essaie {sugg.weight}kg{sugg.reps?` × ${sugg.reps} reps`:""}</span>}
-                        {sugg.type==="reps" && <span style={{color:"#f59e0b",fontWeight:600}}>→ Garde {sugg.weight}kg, vise {sugg.reps} reps</span>}
-                        {sugg.type==="hold" && <span style={{color:T.muted,fontWeight:600}}>→ Maintiens {sugg.weight}kg</span>}
-                        <span style={{color:T.muted,marginLeft:6}}>{sugg.reason}</span>
-                        {sugg.wellnessNote && <div style={{color:T.danger,marginTop:2}}>⚠️ {sugg.wellnessNote}</div>}
-                      </div>
-                    )}
-                  </div>
+                  {/* Contexte dernière séance */}
+                  {last && (
+                    <div style={{fontSize:11,marginBottom:8,padding:"6px 10px",background:T.bgInput,borderRadius:8,color:T.muted}}>
+                      🕐 {last.daysAgo===0?"Aujourd'hui":last.daysAgo===1?"Hier":`Il y a ${last.daysAgo}j`} : {last.sets.length} série{last.sets.length>1?"s":""} @ {last.maxWeight}kg
+                      {last.repsPerSet.length>0 && ` — ${last.repsPerSet.join(", ")} reps`}
+                    </div>
+                  )}
+
+                  {/* Suggestion de progression */}
+                  {sugg && (
+                    <div style={{
+                      marginBottom:10, padding:"10px 12px", borderRadius:10,
+                      background: sugg.type==="weight" ? T.accentDim : sugg.type==="reps" ? "#f59e0b18" : T.bgInput,
+                      border: `1.5px solid ${sugg.type==="weight" ? T.accent : sugg.type==="reps" ? "#f59e0b" : T.border}`,
+                    }}>
+                      {sugg.type==="weight" && (
+                        <div style={{fontWeight:700,fontSize:13,color:T.accent}}>
+                          ↑ Augmente le poids → {sugg.weight} kg{sugg.reps ? ` × ${sugg.reps} reps` : ""}
+                        </div>
+                      )}
+                      {sugg.type==="reps" && (
+                        <div style={{fontWeight:700,fontSize:13,color:"#f59e0b"}}>
+                          ↑ Augmente les répétitions → {sugg.reps} reps @ {sugg.weight} kg
+                        </div>
+                      )}
+                      {sugg.type==="hold" && (
+                        <div style={{fontWeight:700,fontSize:13,color:T.muted}}>
+                          → Maintiens {sugg.weight} kg
+                        </div>
+                      )}
+                      <div style={{fontSize:11,color:T.muted,marginTop:3}}>{sugg.reason}</div>
+                      {sugg.wellnessNote && <div style={{fontSize:11,color:T.danger,marginTop:2}}>⚠️ {sugg.wellnessNote}</div>}
+                    </div>
+                  )}
 
                   {/* Set header */}
                   <div style={{display:"grid",gridTemplateColumns:"18px 22px 1fr 1fr 46px 50px 24px",gap:5,alignItems:"center",marginBottom:4}}>
@@ -647,20 +654,17 @@ export default function App() {
                     <span></span>
                   </div>
 
-                  {/* Sets with inline rest */}
+                  {/* Sets — repos affiché sous chaque série */}
                   {ex.sets.map((s,si)=>{
-                    const restMs = si>0 && s.addedAt && ex.sets[si-1].addedAt ? s.addedAt-ex.sets[si-1].addedAt : null;
-                    const restStr = formatRest(restMs);
+                    const isLast = si === ex.sets.length - 1;
+                    // Repos après CETTE série = temps avant que la suivante soit ajoutée
+                    const nextSet = ex.sets[si+1];
+                    const restAfter = nextSet?.addedAt && s.addedAt ? formatRest(nextSet.addedAt - s.addedAt) : null;
+                    // Dernière série : chrono en direct
+                    const liveRestThis = isLast && s.addedAt ? formatRest(liveNow - s.addedAt) : null;
                     return (
                       <div key={si}>
-                        {restStr && (
-                          <div style={{display:"flex",alignItems:"center",gap:6,margin:"3px 0",opacity:0.6}}>
-                            <div style={{flex:1,height:1,background:T.border}}/>
-                            <span style={{fontSize:10,color:T.muted,whiteSpace:"nowrap"}}>⏱ {restStr}</span>
-                            <div style={{flex:1,height:1,background:T.border}}/>
-                          </div>
-                        )}
-                        <div style={{display:"grid",gridTemplateColumns:"18px 22px 1fr 1fr 46px 50px 24px",gap:5,alignItems:"center",marginBottom:3,opacity:s.isWarmup?0.6:1}}>
+                        <div style={{display:"grid",gridTemplateColumns:"18px 22px 1fr 1fr 46px 50px 24px",gap:5,alignItems:"center",marginBottom:1,opacity:s.isWarmup?0.6:1}}>
                           <span style={{fontSize:11,color:T.muted,textAlign:"center"}}>{si+1}</span>
                           <button onClick={()=>updateSet(ex.id,si,"isWarmup",!s.isWarmup)} title="Série d'échauffement" style={{fontSize:9,fontWeight:700,border:`1px solid ${s.isWarmup?T.accent:T.border}`,borderRadius:4,padding:"2px 0",cursor:"pointer",background:s.isWarmup?T.accentDim:"transparent",color:s.isWarmup?T.accent:T.muted,lineHeight:1,width:"100%"}}>W</button>
                           <input type="number" placeholder="0" value={s.weight} onChange={e=>updateSet(ex.id,si,"weight",e.target.value)} style={{...S.inp,textAlign:"center",padding:"7px 4px"}}/>
@@ -669,18 +673,21 @@ export default function App() {
                           <span style={{fontSize:11,color:T.muted,textAlign:"right"}}>{estimate1RM(s.weight,s.reps)||"—"}</span>
                           <button onClick={()=>removeSet(ex.id,si)} style={{background:"none",border:"none",cursor:"pointer",color:T.muted,fontSize:13}}>✕</button>
                         </div>
+                        {/* Repos pris après cette série (historique) */}
+                        {restAfter && (
+                          <div style={{fontSize:10,color:T.muted,paddingLeft:20,paddingBottom:5,paddingTop:1,opacity:0.75}}>
+                            ⏱ Repos après S{si+1} : <strong>{restAfter}</strong>
+                          </div>
+                        )}
+                        {/* Dernière série : repos en cours (live) */}
+                        {!restAfter && liveRestThis && (
+                          <div style={{fontSize:11,color:T.accent,paddingLeft:20,paddingBottom:5,paddingTop:1,fontWeight:600}}>
+                            ⏱ Repos S{si+1} en cours : {liveRestThis}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
-
-                  {/* Live rest timer on last set */}
-                  {liveRest && (
-                    <div style={{display:"flex",alignItems:"center",gap:6,margin:"4px 0 2px",opacity:0.85}}>
-                      <div style={{flex:1,height:1,background:T.accent,opacity:0.3}}/>
-                      <span style={{fontSize:11,color:T.accent,fontWeight:600,whiteSpace:"nowrap"}}>⏱ En cours : {liveRest}</span>
-                      <div style={{flex:1,height:1,background:T.accent,opacity:0.3}}/>
-                    </div>
-                  )}
 
                   <button onClick={()=>addSet(ex.id)} style={{...S.btnS,marginTop:6,fontSize:11}}>+ Série</button>
                   <input value={ex.notes||""} onChange={e=>updateExNotes(ex.id,e.target.value)} placeholder="Note technique (forme, sensation...)" style={{...S.inp,marginTop:8,fontSize:12,padding:"7px 12px"}}/>
