@@ -194,22 +194,30 @@ export default function App() {
   if(loading||!authReady) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",padding:"3rem",color:T.muted,fontSize:14,background:T.bg,minHeight:"100vh"}}>Chargement...</div>;
 
   if(!user) return (
-    <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:T.bg,padding:16,boxSizing:"border-box"}}>
-      <div style={{width:"min(400px,100%)"}}>
-        <div style={{textAlign:"center",marginBottom:32}}>
-          <div style={{fontSize:48,marginBottom:8}}>🏋️</div>
-          <h1 style={{fontSize:22,fontWeight:700,color:T.text,margin:"0 0 6px"}}>Suivi Muscu</h1>
-          <p style={{fontSize:13,color:T.muted,margin:0}}>Séances · Progression · Performances</p>
+    <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",padding:"32px 16px",boxSizing:"border-box"}}>
+      <div style={{width:"min(440px,100%)"}}>
+        {/* Brand */}
+        <div style={{textAlign:"center",marginBottom:36}}>
+          <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:72,height:72,borderRadius:22,background:T.accentDim,fontSize:36,marginBottom:20,boxShadow:T.shadow}}>🏋️</div>
+          <h1 style={{fontSize:28,fontWeight:800,color:T.text,margin:"0 0 10px",letterSpacing:"-0.8px",lineHeight:1.1}}>Suivi Muscu</h1>
+          <p style={{fontSize:14,color:T.muted,margin:0,lineHeight:1.7}}>
+            Enregistre tes séances · Suis ta progression<br/>
+            Synchronisé sur tous tes appareils
+          </p>
         </div>
-        <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:16,padding:24}}>
+        {/* Card */}
+        <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:20,padding:"28px 32px",boxShadow:T.shadow}}>
           <Auth T={T} S={S}/>
         </div>
+        <p style={{textAlign:"center",fontSize:11,color:T.muted,marginTop:20,opacity:0.6,letterSpacing:"0.02em"}}>
+          Données chiffrées · Synchronisation sécurisée
+        </p>
       </div>
     </div>
   );
 
   return (
-    <div style={{fontFamily:"var(--font-sans)",margin:"0 auto",paddingTop:8,paddingBottom:40,background:T.bg,minHeight:"100vh",color:T.text}}>
+    <div style={{fontFamily:"var(--font-sans)",paddingBottom:48,background:T.bg,minHeight:"100vh",color:T.text}}>
       {editingProgram!==null && <ProgramEditor program={editingProgram==="new"?null:editingProgram} onSave={saveProgram} onCancel={()=>setEditingProgram(null)} T={T} S={S}/>}
       {confirmDelete && (
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:12}}>
@@ -222,14 +230,33 @@ export default function App() {
           </div>
         </div>
       )}
-      <div style={{maxWidth:680,margin:"0 auto",padding:"0 16px"}}>
-        <h2 style={{fontSize:18,fontWeight:700,margin:"0 0 2px",color:T.text}}>🏋️ Suivi Muscu</h2>
-        <p style={{margin:"0 0 16px",fontSize:13,color:T.muted}}>Séances · Progression · Performances</p>
-        <div style={{display:"flex",borderBottom:`1px solid ${T.border}`,marginBottom:20,overflowX:"auto"}}>
-          {[["log","Séance"],["history","Historique"],["progress","Progression"],["programs","Programmes"],["stats","Stats"],["settings","⚙️"]].map(([k,l])=>(
-            <button key={k} style={tabStyle(k)} onClick={()=>setTab(k)}>{l}</button>
-          ))}
+      {/* Header */}
+      <div style={{borderBottom:`1px solid ${T.border}`,background:T.bgCard,boxShadow:`0 1px 0 ${T.border}`}}>
+        <div style={{maxWidth:680,margin:"0 auto",padding:"0 16px"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 0 0"}}>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:38,height:38,borderRadius:12,background:T.accentDim,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>🏋️</div>
+              <div>
+                <div style={{fontSize:15,fontWeight:700,color:T.text,letterSpacing:"-0.3px",lineHeight:1.2}}>Suivi Muscu</div>
+                <div style={{fontSize:11,color:T.muted,lineHeight:1}}>Séances · Progression · Performances</div>
+              </div>
+            </div>
+            <button
+              onClick={()=>setTab("settings")}
+              title={user.email}
+              style={{width:36,height:36,borderRadius:"50%",background:tab==="settings"?T.accent:T.accentDim,color:tab==="settings"?T.onAccent:T.accent,border:"none",cursor:"pointer",fontSize:14,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,letterSpacing:0}}
+            >
+              {user.email[0].toUpperCase()}
+            </button>
+          </div>
+          <div style={{display:"flex",overflowX:"auto",gap:0,marginTop:2}}>
+            {[["log","Séance"],["history","Historique"],["progress","Progression"],["programs","Programmes"],["stats","Stats"]].map(([k,l])=>(
+              <button key={k} style={tabStyle(k)} onClick={()=>setTab(k)}>{l}</button>
+            ))}
+          </div>
         </div>
+      </div>
+      <div style={{maxWidth:680,margin:"0 auto",padding:"20px 16px 0"}}>
 
         {tab==="log" && (
           <div>

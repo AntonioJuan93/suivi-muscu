@@ -7,12 +7,12 @@ export const INITIAL_PROGRAMS = [
 ];
 
 export const THEMES = {
-  forest:    { label:"🌿 Forest",     bg:"#eef4ee", bgCard:"#f7fbf7", bgInput:"#ffffff", bgModal:"#f7fbf7", border:"#c2d9c2", text:"#1f3320", muted:"#6a8f6a", accent:"#3a7d44", accentDim:"#d4ebd6", danger:"#b94040", onAccent:"#fff", chart2:"#8fbf6a" },
-  carbon:    { label:"⚡ Carbon",      bg:"#111111", bgCard:"#1a1a1a", bgInput:"#222222", bgModal:"#161616", border:"#2e2e2e", text:"#f5f5f5", muted:"#777777", accent:"#f5e642", accentDim:"#2e2a00", danger:"#ff4d4d", onAccent:"#111", chart2:"#888" },
-  cappuccino:{ label:"☕ Cappuccino",  bg:"#f5ede0", bgCard:"#fdf6ee", bgInput:"#ffffff", bgModal:"#fdf6ee", border:"#ddc9b0", text:"#3b2a1a", muted:"#9a7a5a", accent:"#8b5e3c", accentDim:"#f0deca", danger:"#b94040", onAccent:"#fff", chart2:"#c8a06a" },
-  nordic:    { label:"🏔️ Nordic",     bg:"#1e2430", bgCard:"#252d3a", bgInput:"#2c3547", bgModal:"#1e2430", border:"#3a4559", text:"#e4eaf5", muted:"#7a8fa8", accent:"#5bc4e8", accentDim:"#1a3a4a", danger:"#f07878", onAccent:"#0d1a24", chart2:"#4a6fa5" },
-  anthracite:{ label:"🌑 Anthracite",  bg:"#1a1a1a", bgCard:"#242424", bgInput:"#2e2e2e", bgModal:"#1f1f1f", border:"#3a3a3a", text:"#f0f0f0", muted:"#888888", accent:"#7F77DD", accentDim:"#2e2b4a", danger:"#f87171", onAccent:"#fff", chart2:"#a06fd8" },
-  ocean:     { label:"🌊 Ocean",       bg:"#0d1b2a", bgCard:"#14283c", bgInput:"#1b3450", bgModal:"#0d1b2a", border:"#2a4a68", text:"#e0f0ff", muted:"#6a90b0", accent:"#2dd4bf", accentDim:"#0d3a38", danger:"#f07878", onAccent:"#06201d", chart2:"#3b82f6" },
+  forest:    { label:"🌿 Forest",     bg:"#eef4ee", bgCard:"#ffffff", bgInput:"#f7fbf7", bgModal:"#ffffff", border:"#d0e4d0", text:"#1a2e1c", muted:"#6a8f6a", accent:"#3a7d44", accentDim:"#d4ebd6", danger:"#c0392b", onAccent:"#fff", chart2:"#8fbf6a", shadow:"0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.08)" },
+  carbon:    { label:"⚡ Carbon",      bg:"#0d0d0d", bgCard:"#1a1a1a", bgInput:"#222222", bgModal:"#161616", border:"#2a2a2a", text:"#f0f0f0", muted:"#666666", accent:"#f5e642", accentDim:"#2a2600", danger:"#ff4d4d", onAccent:"#111", chart2:"#888", shadow:"0 1px 3px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.5)" },
+  cappuccino:{ label:"☕ Cappuccino",  bg:"#f5ede0", bgCard:"#ffffff", bgInput:"#fdf6ee", bgModal:"#ffffff", border:"#e0c9b0", text:"#3b2a1a", muted:"#9a7a5a", accent:"#8b5e3c", accentDim:"#f0deca", danger:"#c0392b", onAccent:"#fff", chart2:"#c8a06a", shadow:"0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.09)" },
+  nordic:    { label:"🏔️ Nordic",     bg:"#1a2030", bgCard:"#222b3a", bgInput:"#2a3448", bgModal:"#1a2030", border:"#364255", text:"#e4eaf5", muted:"#7a8fa8", accent:"#5bc4e8", accentDim:"#162f3e", danger:"#f07878", onAccent:"#0d1a24", chart2:"#4a6fa5", shadow:"0 1px 3px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.4)" },
+  anthracite:{ label:"🌑 Anthracite",  bg:"#161616", bgCard:"#202020", bgInput:"#2a2a2a", bgModal:"#1c1c1c", border:"#333333", text:"#f0f0f0", muted:"#888888", accent:"#7F77DD", accentDim:"#28264a", danger:"#f87171", onAccent:"#fff", chart2:"#a06fd8", shadow:"0 1px 3px rgba(0,0,0,0.35), 0 8px 24px rgba(0,0,0,0.45)" },
+  ocean:     { label:"🌊 Ocean",       bg:"#0b1825", bgCard:"#112233", bgInput:"#162d44", bgModal:"#0b1825", border:"#244060", text:"#e0f0ff", muted:"#6a90b0", accent:"#2dd4bf", accentDim:"#0a2e2b", danger:"#f07878", onAccent:"#06201d", chart2:"#3b82f6", shadow:"0 1px 3px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.4)" },
 };
 
 export function formatDate(d) { return new Date(d).toLocaleDateString("fr-FR",{day:"2-digit",month:"short",year:"2-digit"}); }
@@ -22,10 +22,10 @@ export function startOfWeek(d) { const x=new Date(d); const day=(x.getDay()+6)%7
 
 export function makeStyles(T) {
   return {
-    inp:{ background:T.bgInput, border:`1px solid ${T.border}`, borderRadius:8, padding:"7px 10px", fontSize:13, color:T.text, outline:"none", width:"100%", boxSizing:"border-box" },
-    card:{ background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:12, padding:"14px 16px", marginBottom:12 },
-    btnP:{ background:T.accent, color:T.onAccent, border:"none", borderRadius:8, padding:"8px 18px", cursor:"pointer", fontSize:13, fontWeight:700 },
-    btnS:{ background:"transparent", color:T.muted, border:`1px solid ${T.border}`, borderRadius:8, padding:"6px 12px", cursor:"pointer", fontSize:12 },
-    btnD:{ background:"transparent", color:T.danger, border:`1px solid ${T.danger}`, borderRadius:8, padding:"6px 12px", cursor:"pointer", fontSize:12 },
+    inp:{ background:T.bgInput, border:`1px solid ${T.border}`, borderRadius:10, padding:"10px 14px", fontSize:14, color:T.text, outline:"none", width:"100%", boxSizing:"border-box" },
+    card:{ background:T.bgCard, border:`1px solid ${T.border}`, borderRadius:14, padding:"16px 18px", marginBottom:12, boxShadow:T.shadow },
+    btnP:{ background:T.accent, color:T.onAccent, border:"none", borderRadius:10, padding:"11px 22px", cursor:"pointer", fontSize:14, fontWeight:600, letterSpacing:"0.01em" },
+    btnS:{ background:"transparent", color:T.muted, border:`1px solid ${T.border}`, borderRadius:8, padding:"7px 14px", cursor:"pointer", fontSize:13 },
+    btnD:{ background:"transparent", color:T.danger, border:`1px solid ${T.danger}`, borderRadius:8, padding:"7px 14px", cursor:"pointer", fontSize:13 },
   };
 }
