@@ -27,7 +27,14 @@ export const THEMES = {
 
 export function formatDate(d) { return new Date(d).toLocaleDateString("fr-FR",{day:"2-digit",month:"short",year:"2-digit"}); }
 export function calcVolume(sets) { return sets.reduce((acc,s)=>acc+(parseFloat(s.weight)||0)*(parseInt(s.reps)||0),0); }
-export function estimate1RM(weight,reps) { const w=parseFloat(weight)||0,r=parseInt(reps)||0; if(!w||!r)return 0; return Math.round(w*(1+r/30)); }
+export function estimate1RM(weight,reps) {
+  const w=parseFloat(weight)||0,r=parseInt(reps)||0;
+  if(!w||!r||r>20)return 0;
+  if(r===1)return Math.round(w);
+  // Brzycki (plus précis pour 2-10 reps), Epley au-dessus
+  if(r<=10) return Math.round(w/(1.0278-0.0278*r));
+  return Math.round(w*(1+r/30));
+}
 export function startOfWeek(d) { const x=new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); x.setHours(0,0,0,0); return x; }
 
 export function makeStyles(T) {
