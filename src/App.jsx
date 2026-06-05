@@ -120,7 +120,13 @@ export default function App() {
         if(d) applyData(d,false);
         setCloudLoaded(true);
       }
-      if(event==="SIGNED_OUT"){ clearCloudCache(); setCloudLoaded(false); }
+      if(event==="SIGNED_OUT"){
+        clearCloudCache(); setCloudLoaded(false);
+        setSessions([]); setPrograms(INITIAL_PROGRAMS); setThemeKey("forest");
+        setExercises([]); setSessionDate(new Date().toISOString().split("T")[0]);
+        setSessionDuration(""); setSessionNotes(""); setMode("free"); setSelectedProgram(null);
+        saveData(null);
+      }
     });
     return ()=>subscription.unsubscribe();
   // eslint-disable-next-line react-hooks/exhaustive-deps
