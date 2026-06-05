@@ -58,7 +58,7 @@ export default function App() {
   const [tab, setTab] = useState("log");
   const [sessions, setSessions] = useState([]);
   const [programs, setPrograms] = useState(INITIAL_PROGRAMS);
-  const [themeKey, setThemeKey] = useState("forest");
+  const [themeKey, setThemeKey] = useState("clair");
   const [loading, setLoading] = useState(true);
   const [ready, setReady] = useState(false);
   const [editingProgram, setEditingProgram] = useState(null);
@@ -125,7 +125,7 @@ export default function App() {
       }
       if(event==="SIGNED_OUT"){
         clearCloudCache(); setCloudLoaded(false);
-        setSessions([]); setPrograms(INITIAL_PROGRAMS); setThemeKey("forest");
+        setSessions([]); setPrograms(INITIAL_PROGRAMS); setThemeKey("clair");
         setExercises([]); setSessionDate(new Date().toISOString().split("T")[0]);
         setSessionDuration(""); setSessionNotes(""); setMode("free"); setSelectedProgram(null);
         saveData(null);
@@ -433,11 +433,10 @@ export default function App() {
               <button onClick={()=>supabase.auth.signOut()} style={{...S.btnS,color:T.danger,borderColor:T.danger}}>Se déconnecter</button>
             </div>
             <div style={S.card}>
-              <p style={{margin:"0 0 10px",fontSize:14,fontWeight:600,color:T.text}}>🎨 Thème</p>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <p style={{margin:"0 0 14px",fontSize:14,fontWeight:600,color:T.text}}>Apparence</p>
+              <div style={{display:"flex",background:T.bgInput,borderRadius:12,padding:4,gap:4}}>
                 {Object.entries(THEMES).map(([k,th])=>(
-                  <button key={k} onClick={()=>setThemeKey(k)} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,cursor:"pointer",background:k===themeKey?T.accentDim:"transparent",color:T.text,border:`1px solid ${k===themeKey?T.accent:T.border}`,fontSize:13,textAlign:"left"}}>
-                    <span style={{display:"flex",gap:3}}><span style={{width:12,height:12,borderRadius:3,background:th.bg,border:`1px solid ${th.border}`}}/><span style={{width:12,height:12,borderRadius:3,background:th.accent}}/></span>
+                  <button key={k} onClick={()=>setThemeKey(k)} style={{flex:1,padding:"9px 0",borderRadius:9,border:"none",cursor:"pointer",fontSize:13,fontWeight:k===themeKey?600:400,color:k===themeKey?T.accent:T.muted,background:k===themeKey?T.bgCard:"transparent",boxShadow:k===themeKey?T.shadow:"none",transition:"all 0.15s"}}>
                     {th.label}
                   </button>
                 ))}
