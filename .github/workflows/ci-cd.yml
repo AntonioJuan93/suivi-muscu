@@ -23,6 +23,8 @@ jobs:
       - run: npm run build
         env:
           VITE_BASE: /suivi-muscu/
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
   deploy-staging:
     name: Deploiement recette
@@ -39,6 +41,8 @@ jobs:
       - run: npm run build
         env:
           VITE_BASE: /suivi-muscu/staging/
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       - uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -61,6 +65,8 @@ jobs:
       - run: npm run build
         env:
           VITE_BASE: /suivi-muscu/
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       - uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

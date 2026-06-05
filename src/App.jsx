@@ -2,6 +2,9 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { MUSCLE_GROUPS, INITIAL_PROGRAMS, THEMES, formatDate, calcVolume, estimate1RM, startOfWeek, makeStyles } from "./theme";
 import { loadData, saveData } from "./storage";
+import { supabase } from "./supabase";
+import { loadCloud, saveCloud, clearCloudCache } from "./cloud";
+import Auth from "./Auth";
 
 function Tag({ children, T }) {
   return <span style={{ fontSize:11, background:T.accentDim, color:T.accent, padding:"2px 8px", borderRadius:99 }}>{children}</span>;
@@ -72,6 +75,8 @@ export default function App() {
   const [newExMuscle, setNewExMuscle] = useState(MUSCLE_GROUPS[0]);
   const [progressEx, setProgressEx] = useState("");
   const [historyFilter, setHistoryFilter] = useState("");
+  const [user, setUser] = useState(null);
+  const [cloudLoaded, setCloudLoaded] = useState(false);
 
   const T = THEMES[themeKey] || THEMES.forest;
   const S = useMemo(()=>makeStyles(T), [themeKey]);
@@ -97,14 +102,28 @@ export default function App() {
   useEffect(()=>{
     if(!ready) return;
     if(saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current=setTimeout(()=>saveData(fullData()), 400);
+    saveTimer.current=setTimeout(()=>{ const d=fullData(); saveData(d); if(user&&cloudLoaded) saveCloud(d); }, 400);
     return ()=>{ if(saveTimer.current) clearTimeout(saveTimer.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[sessions,programs,themeKey,exercises,sessionDate,sessionDuration,sessionNotes,mode,selectedProgram,ready]);
+  },[sessions,programs,themeKey,exercises,sessionDate,sessionDuration,sessionNotes,mode,selectedProgram,ready,user,cloudLoaded]);
   useEffect(()=>{
     const onStorage=(e)=>{ if(e.key==="suivi_muscu_data"){ const d=loadData(); if(d) applyData(d,false); } };
     window.addEventListener("storage",onStorage);
     return ()=>window.removeEventListener("storage",onStorage);
+  },[]);
+  useEffect(()=>{
+    const {data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{
+      const u=session?.user??null;
+      setUser(u);
+      if((event==="SIGNED_IN"||event==="INITIAL_SESSION")&&u){
+        const d=await loadCloud();
+        if(d) applyData(d,false);
+        setCloudLoaded(true);
+      }
+      if(event==="SIGNED_OUT"){ clearCloudCache(); setCloudLoaded(false); }
+    });
+    return ()=>subscription.unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
   function saveProgram(data){
@@ -355,6 +374,21 @@ export default function App() {
 
         {tab==="settings" && (
           <div>
+            <div style={S.card}>
+              <p style={{margin:"0 0 10px",fontSize:14,fontWeight:600,color:T.text}}>☁️ Synchronisation cloud</p>
+              {user?(
+                <div>
+                  <p style={{fontSize:13,color:T.muted,marginBottom:4}}>Connecté : <strong style={{color:T.text}}>{user.email}</strong></p>
+                  <p style={{fontSize:12,color:T.muted,marginBottom:12}}>Tes données se synchronisent automatiquement entre tes appareils.</p>
+                  <button onClick={()=>supabase.auth.signOut()} style={S.btnS}>Se déconnecter</button>
+                </div>
+              ):(
+                <div>
+                  <p style={{fontSize:12,color:T.muted,marginBottom:12}}>Connecte-toi pour synchroniser tes données entre PC et mobile.</p>
+                  <Auth T={T} S={S}/>
+                </div>
+              )}
+            </div>
             <div style={S.card}>
               <p style={{margin:"0 0 10px",fontSize:14,fontWeight:600,color:T.text}}>🎨 Thème</p>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
