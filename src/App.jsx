@@ -77,6 +77,7 @@ export default function App() {
   const [historyFilter, setHistoryFilter] = useState("");
   const [user, setUser] = useState(null);
   const [cloudLoaded, setCloudLoaded] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
 
   const T = THEMES[themeKey] || THEMES.forest;
   const S = useMemo(()=>makeStyles(T), [themeKey]);
@@ -115,10 +116,12 @@ export default function App() {
     const {data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{
       const u=session?.user??null;
       setUser(u);
-      if((event==="SIGNED_IN"||event==="INITIAL_SESSION")&&u){
-        const d=await loadCloud();
-        if(d) applyData(d,false);
-        setCloudLoaded(true);
+      if(event==="INITIAL_SESSION"){
+        if(u){ const d=await loadCloud(); if(d) applyData(d,false); setCloudLoaded(true); }
+        setAuthReady(true);
+      }
+      if(event==="SIGNED_IN"){
+        const d=await loadCloud(); if(d) applyData(d,false); setCloudLoaded(true);
       }
       if(event==="SIGNED_OUT"){
         clearCloudCache(); setCloudLoaded(false);
@@ -188,7 +191,22 @@ export default function App() {
   const usedMuscles=[...new Set(sessions.flatMap(s=>s.exercises.map(e=>e.muscle)))];
   const tabStyle=t=>({padding:"8px 10px",border:"none",cursor:"pointer",fontSize:13,whiteSpace:"nowrap",borderBottom:tab===t?`2px solid ${T.accent}`:"2px solid transparent",color:tab===t?T.accent:T.muted,background:"transparent",fontWeight:tab===t?600:400});
 
-  if(loading) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",padding:"3rem",color:T.muted,fontSize:14,background:T.bg,minHeight:"100vh"}}>Chargement...</div>;
+  if(loading||!authReady) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",padding:"3rem",color:T.muted,fontSize:14,background:T.bg,minHeight:"100vh"}}>Chargement...</div>;
+
+  if(!user) return (
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:T.bg,padding:16,boxSizing:"border-box"}}>
+      <div style={{width:"min(400px,100%)"}}>
+        <div style={{textAlign:"center",marginBottom:32}}>
+          <div style={{fontSize:48,marginBottom:8}}>🏋️</div>
+          <h1 style={{fontSize:22,fontWeight:700,color:T.text,margin:"0 0 6px"}}>Suivi Muscu</h1>
+          <p style={{fontSize:13,color:T.muted,margin:0}}>Séances · Progression · Performances</p>
+        </div>
+        <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:16,padding:24}}>
+          <Auth T={T} S={S}/>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{fontFamily:"var(--font-sans)",margin:"0 auto",paddingTop:8,paddingBottom:40,background:T.bg,minHeight:"100vh",color:T.text}}>
@@ -381,19 +399,11 @@ export default function App() {
         {tab==="settings" && (
           <div>
             <div style={S.card}>
-              <p style={{margin:"0 0 10px",fontSize:14,fontWeight:600,color:T.text}}>☁️ Synchronisation cloud</p>
-              {user?(
-                <div>
-                  <p style={{fontSize:13,color:T.muted,marginBottom:4}}>Connecté : <strong style={{color:T.text}}>{user.email}</strong></p>
-                  <p style={{fontSize:12,color:T.muted,marginBottom:12}}>Tes données se synchronisent automatiquement entre tes appareils.</p>
-                  <button onClick={()=>supabase.auth.signOut()} style={S.btnS}>Se déconnecter</button>
-                </div>
-              ):(
-                <div>
-                  <p style={{fontSize:12,color:T.muted,marginBottom:12}}>Connecte-toi pour synchroniser tes données entre PC et mobile.</p>
-                  <Auth T={T} S={S}/>
-                </div>
-              )}
+              <p style={{margin:"0 0 10px",fontSize:14,fontWeight:600,color:T.text}}>👤 Mon compte</p>
+              <p style={{fontSize:13,color:T.muted,marginBottom:4}}>Connecté en tant que</p>
+              <p style={{fontSize:13,fontWeight:600,color:T.text,marginBottom:14}}>{user.email}</p>
+              <p style={{fontSize:12,color:T.muted,marginBottom:14}}>Tes données sont synchronisées automatiquement entre tes appareils.</p>
+              <button onClick={()=>supabase.auth.signOut()} style={{...S.btnS,color:T.danger,borderColor:T.danger}}>Se déconnecter</button>
             </div>
             <div style={S.card}>
               <p style={{margin:"0 0 10px",fontSize:14,fontWeight:600,color:T.text}}>🎨 Thème</p>
