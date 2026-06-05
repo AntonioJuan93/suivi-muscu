@@ -17,11 +17,11 @@ export const THEMES = {
   },
   sombre: {
     label:"🌙 Sombre",
-    bg:"#202124",       bgCard:"#292a2d",   bgInput:"#3c4043",
-    bgModal:"#292a2d",  border:"#5f6368",   text:"#e8eaed",
-    muted:"#9aa0a6",    accent:"#bdc1c6",   accentDim:"#3c4043",
-    danger:"#f28b82",   onAccent:"#202124", chart2:"#80868b",
-    shadow:"0 1px 2px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.4)",
+    bg:"#07090f",       bgCard:"#0e1220",   bgInput:"#141928",
+    bgModal:"#0e1220",  border:"#1a2540",   text:"#dde8ff",
+    muted:"#4a6080",    accent:"#00d4ff",   accentDim:"#00d4ff15",
+    danger:"#ff4d6d",   onAccent:"#07090f", chart2:"#7c3aed",
+    shadow:"0 0 0 1px #00d4ff18, 0 4px 24px rgba(0,212,255,0.12)",
   },
 };
 
