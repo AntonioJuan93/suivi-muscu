@@ -117,11 +117,11 @@ export default function App() {
       const u=session?.user??null;
       setUser(u);
       if(event==="INITIAL_SESSION"){
-        if(u){ const d=await loadCloud(); if(d) applyData(d,false); setCloudLoaded(true); }
         setAuthReady(true);
+        if(u){ loadCloud().then(d=>{ if(d) applyData(d,false); setCloudLoaded(true); }); }
       }
       if(event==="SIGNED_IN"){
-        const d=await loadCloud(); if(d) applyData(d,false); setCloudLoaded(true);
+        loadCloud().then(d=>{ if(d) applyData(d,false); setCloudLoaded(true); });
       }
       if(event==="SIGNED_OUT"){
         clearCloudCache(); setCloudLoaded(false);
