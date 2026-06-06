@@ -411,12 +411,15 @@ export default function App() {
   function removeExercise(id){ setExercises(ex=>ex.filter(e=>e.id!==id)); }
   function updateExNotes(id,v){ setExercises(ex=>ex.map(e=>e.id===id?{...e,notes:v}:e)); }
 
-  function addExercise(nameOverride) {
+  function addExercise(nameOverride, equipOverride) {
     const name=(nameOverride||newExName).trim(); if(!name)return;
-    let muscle=newExMuscle, equipment=newExEquipment;
-    for(const s of sessions){ const f=s.exercises.find(e=>e.name===name); if(f){ muscle=f.muscle; equipment=f.equipment||""; break; } }
+    const equipment=equipOverride!==undefined?equipOverride:newExEquipment;
+    let muscle=newExMuscle;
+    // Cherche d'abord avec le même équipement, puis sans distinction
+    for(const s of sessions){ const f=s.exercises.find(e=>e.name===name&&(e.equipment||"")===(equipment||"")); if(f){ muscle=f.muscle; break; } }
+    if(muscle===newExMuscle){ for(const s of sessions){ const f=s.exercises.find(e=>e.name===name); if(f){ muscle=f.muscle; break; } } }
     setExercises(ex=>[...ex,{id:Date.now(),name,muscle,equipment,notes:"",sets:[{weight:"",reps:"",rpe:"",isWarmup:false,restMs:null}]}]);
-    setNewExName(""); setNewExEquipment("");
+    setNewExName(""); if(equipOverride===undefined) setNewExEquipment("");
   }
 
   function saveSession() {
@@ -748,10 +751,17 @@ export default function App() {
             {/* Add exercise */}
             <div style={{...S.card,borderStyle:"dashed"}}>
               <p style={{margin:"0 0 10px",fontSize:13,fontWeight:600,color:T.text}}>Ajouter un exercice</p>
-              {allExNames.length>0&&(
+              {allExVariants.length>0&&(
                 <><p style={{fontSize:11,color:T.muted,margin:"0 0 6px"}}>Exercices récents</p>
                 <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
-                  {allExNames.filter(n=>!exercises.find(e=>e.name===n)).map(n=><button key={n} onClick={()=>addExercise(n)} style={{...S.btnS,fontSize:12,padding:"4px 12px"}}>{n}</button>)}
+                  {allExVariants
+                    .filter(v=>!exercises.find(e=>e.name===v.name&&(e.equipment||"")===(v.equipment||"")))
+                    .map(v=>(
+                      <button key={v.key} onClick={()=>addExercise(v.name,v.equipment)} style={{...S.btnS,fontSize:12,padding:"4px 12px"}}>
+                        {v.name}{v.equipment?<span style={{color:T.accent,marginLeft:4}}>{equipLabel(v.equipment)}</span>:""}
+                      </button>
+                    ))
+                  }
                 </div></>
               )}
               <p style={{fontSize:11,color:T.muted,margin:"0 0 6px"}}>Nouvel exercice</p>
