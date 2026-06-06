@@ -8,7 +8,7 @@ export const INITIAL_PROGRAMS = [
 
 export const THEMES = {
   clair: {
-    label:"☀️ Clair",
+    label:"Clair",
     bg:"#f8f9fa",       bgCard:"#ffffff",   bgInput:"#f1f3f4",
     bgModal:"#ffffff",  border:"#dadce0",   text:"#202124",
     muted:"#80868b",    accent:"#6d28d9",   accentDim:"#ede9fe",
@@ -16,7 +16,7 @@ export const THEMES = {
     shadow:"0 1px 2px rgba(60,64,67,0.08), 0 4px 16px rgba(60,64,67,0.10)",
   },
   sombre: {
-    label:"🌙 Sombre",
+    label:"Sombre",
     bg:"#0c0a14",       bgCard:"#131020",   bgInput:"#1c1830",
     bgModal:"#13102a",  border:"#2e2450",   text:"#ede8ff",
     muted:"#6b5c8a",    accent:"#c084fc",   accentDim:"#c084fc18",

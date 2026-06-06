@@ -8,10 +8,10 @@ import Auth from "./Auth";
 
 const EQUIPMENT = [
   {v:"",l:"Équipement..."},
-  {v:"barre",l:"🏋️ Barre"},
-  {v:"alteres",l:"💪 Altères"},
-  {v:"poulie",l:"🔗 Poulie"},
-  {v:"machine",l:"⚙️ Machine guidée"},
+  {v:"barre",l:"Barre"},
+  {v:"alteres",l:"Altères"},
+  {v:"poulie",l:"Poulie"},
+  {v:"machine",l:"Machine guidée"},
 ];
 function equipLabel(v){ return EQUIPMENT.find(e=>e.v===v)?.l||""; }
 function exKey(name,equip){ return name+(equip?":::"+equip:""); }
@@ -21,7 +21,7 @@ function Tag({ children, T }) {
 }
 
 function StarRating({ value, onChange, T, emoji }) {
-  const icons = emoji ? ["😞","😐","🙂","😊","🔥"] : ["1","2","3","4","5"];
+  const icons = ["1","2","3","4","5"];
   return (
     <div style={{ display:"flex", gap:4 }}>
       {[1,2,3,4,5].map(n => (
@@ -555,7 +555,7 @@ export default function App() {
   const recoveryColor={tired:T.danger,recovering:"#f59e0b",fresh:T.accent};
   const recoveryLabel={tired:"Fatigué",recovering:"Récupération",fresh:"Prêt"};
   const ratingColors=["#ef4444","#f97316","#eab308","#22c55e","#6366f1"];
-  const ratingEmojis=["😞","😐","🙂","😊","🔥"];
+  const ratingLabels=["Difficile","Moyen","Bien","Super","Excellent"];
 
   // ── Auth screens ──────────────────────────────────────────────────────────
   if(loading||!authReady) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",padding:"3rem",color:T.muted,fontSize:14,background:T.bg,minHeight:"100vh"}}>Chargement...</div>;
@@ -564,7 +564,7 @@ export default function App() {
     <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",padding:"32px 16px",boxSizing:"border-box"}}>
       <div style={{width:"min(440px,100%)"}}>
         <div style={{textAlign:"center",marginBottom:36}}>
-          <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:72,height:72,borderRadius:22,background:T.accentDim,fontSize:36,marginBottom:20,boxShadow:T.shadow}}>🏋️</div>
+          <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:72,height:72,borderRadius:22,background:T.accent,fontSize:28,fontWeight:800,marginBottom:20,boxShadow:T.shadow,color:T.onAccent,letterSpacing:"-1px"}}>SM</div>
           <h1 style={{fontSize:28,fontWeight:800,color:T.text,margin:"0 0 10px",letterSpacing:"-0.8px"}}>Suivi Muscu</h1>
           <p style={{fontSize:14,color:T.muted,margin:0,lineHeight:1.7}}>Enregistre tes séances · Suis ta progression<br/>Synchronisé sur tous tes appareils</p>
         </div>
@@ -584,7 +584,7 @@ export default function App() {
             <p style={{fontSize:14,marginBottom:20,color:T.text}}>Supprimer <strong>{confirmDelete.name||formatDate(confirmDelete.date)}</strong> ?</p>
             <div style={{display:"flex",gap:10,justifyContent:"center"}}>
               <button onClick={()=>setConfirmDelete(null)} style={S.btnS}>Annuler</button>
-              <button onClick={()=>confirmDelete.exercises?deleteSession(confirmDelete.id):deleteProgram(confirmDelete.id)} style={S.btnD}>Supprimer</button>
+              <button onClick={()=>confirmDelete.date?deleteSession(confirmDelete.id):deleteProgram(confirmDelete.id)} style={S.btnD}>Supprimer</button>
             </div>
           </div>
         </div>
@@ -595,7 +595,7 @@ export default function App() {
         <div style={{maxWidth:680,margin:"0 auto",padding:"0 16px"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 0 0"}}>
             <div style={{display:"flex",alignItems:"center",gap:12}}>
-              <div style={{width:38,height:38,borderRadius:12,background:T.accentDim,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>🏋️</div>
+              <div style={{width:38,height:38,borderRadius:12,background:T.accent,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,flexShrink:0,color:T.onAccent,letterSpacing:"-0.5px"}}>SM</div>
               <div>
                 <div style={{fontSize:15,fontWeight:700,color:T.text,letterSpacing:"-0.3px"}}>Suivi Muscu</div>
                 <div style={{fontSize:11,color:T.muted}}>Séances · Progression · Performances</div>
@@ -655,7 +655,7 @@ export default function App() {
                       <select value={ex.equipment||""} onChange={e=>setExercises(xs=>xs.map(x=>x.id===ex.id?{...x,equipment:e.target.value}:x))} style={{fontSize:11,color:T.muted,background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:99,padding:"2px 7px",cursor:"pointer",outline:"none"}}>
                         {EQUIPMENT.map(eq=><option key={eq.v} value={eq.v}>{eq.l}</option>)}
                       </select>
-                      {ex.target?.reps && <span style={{fontSize:11,color:T.muted,background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:99,padding:"2px 8px"}}>🎯 {ex.target.sets?`${ex.target.sets}×`:""}  {ex.target.reps}</span>}
+                      {ex.target?.reps && <span style={{fontSize:11,color:T.muted,background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:99,padding:"2px 8px"}}>Cible : {ex.target.sets?`${ex.target.sets}×`:""}  {ex.target.reps}</span>}
                     </div>
                     <button onClick={()=>removeExercise(ex.id)} style={{...S.btnS,padding:"3px 8px",fontSize:11}}>✕</button>
                   </div>
@@ -691,7 +691,7 @@ export default function App() {
                         </div>
                       )}
                       <div style={{fontSize:11,color:T.muted,marginTop:3}}>{sugg.reason}</div>
-                      {sugg.wellnessNote && <div style={{fontSize:11,color:T.danger,marginTop:2}}>⚠️ {sugg.wellnessNote}</div>}
+                      {sugg.wellnessNote && <div style={{fontSize:11,color:T.danger,marginTop:2}}>{sugg.wellnessNote}</div>}
                     </div>
                   )}
 
@@ -783,7 +783,7 @@ export default function App() {
                 <p style={{margin:"0 0 12px",fontSize:13,fontWeight:600,color:T.text}}>Bilan de séance</p>
                 <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:14}}>
                   <div>
-                    <label style={{fontSize:11,color:T.muted,display:"block",marginBottom:6}}>⚖️ Poids de corps (kg)</label>
+                    <label style={{fontSize:11,color:T.muted,display:"block",marginBottom:6}}>Poids de corps (kg)</label>
                     <input type="number" placeholder="75" value={sessionBodyweight} onChange={e=>setSessionBodyweight(e.target.value)} style={{...S.inp,width:90,padding:"7px 10px"}}/>
                   </div>
                   <div>
@@ -792,12 +792,12 @@ export default function App() {
                   </div>
                 </div>
                 <div style={{display:"flex",gap:16,flexWrap:"wrap",marginBottom:14}}>
-                  <div><label style={{fontSize:11,color:T.muted,display:"block",marginBottom:6}}>💤 Sommeil</label><SleepEnergyRating value={sessionSleep} onChange={setSessionSleep} T={T}/></div>
-                  <div><label style={{fontSize:11,color:T.muted,display:"block",marginBottom:6}}>⚡ Énergie</label><SleepEnergyRating value={sessionEnergy} onChange={setSessionEnergy} T={T}/></div>
+                  <div><label style={{fontSize:11,color:T.muted,display:"block",marginBottom:6}}>Sommeil</label><SleepEnergyRating value={sessionSleep} onChange={setSessionSleep} T={T}/></div>
+                  <div><label style={{fontSize:11,color:T.muted,display:"block",marginBottom:6}}>Énergie</label><SleepEnergyRating value={sessionEnergy} onChange={setSessionEnergy} T={T}/></div>
                 </div>
                 <label style={{fontSize:12,color:T.muted,display:"block",marginBottom:4}}>Notes</label>
                 <textarea value={sessionNotes} onChange={e=>setSessionNotes(e.target.value)} placeholder="Sensations, fatigue..." rows={2} style={{...S.inp,resize:"vertical",marginBottom:12}}/>
-                <button onClick={saveSession} style={{...S.btnP,width:"100%",padding:12,fontSize:14}}>💾 Enregistrer la séance</button>
+                <button onClick={saveSession} style={{...S.btnP,width:"100%",padding:12,fontSize:14}}>Enregistrer la séance</button>
               </div>
             )}
           </div>
@@ -832,17 +832,17 @@ export default function App() {
                       </div>
                     </div>
                     <div style={{display:"flex",gap:6}}>
-                      <button onClick={()=>repeatSession(s)} style={{...S.btnS,padding:"3px 8px",fontSize:11}}>🔁</button>
-                      <button onClick={()=>setConfirmDelete(s)} style={{...S.btnD,padding:"3px 8px",fontSize:11}}>🗑️</button>
+                      <button onClick={()=>repeatSession(s)} style={{...S.btnS,padding:"3px 8px",fontSize:11}}>↺</button>
+                      <button onClick={()=>setConfirmDelete(s)} style={{...S.btnD,padding:"3px 8px",fontSize:11}}>✕</button>
                     </div>
                   </div>
 
                   {/* Bien-être */}
                   {(s.rating||s.sleep||s.energy)&&(
                     <div style={{display:"flex",gap:12,marginBottom:10,padding:"7px 12px",background:T.bgInput,borderRadius:8,flexWrap:"wrap",alignItems:"center"}}>
-                      {s.rating&&<span style={{fontSize:13,color:ratingColors[s.rating-1],fontWeight:700}}>{ratingEmojis[s.rating-1]} {["Difficile","Moyen","Bien","Super","Excellent"][s.rating-1]}</span>}
-                      {s.sleep&&<span style={{fontSize:12,color:T.muted}}>💤 <strong style={{color:T.text}}>{s.sleep}/5</strong></span>}
-                      {s.energy&&<span style={{fontSize:12,color:T.muted}}>⚡ <strong style={{color:T.text}}>{s.energy}/5</strong></span>}
+                      {s.rating&&<span style={{fontSize:13,color:ratingColors[s.rating-1],fontWeight:700}}>{ratingLabels[s.rating-1]}</span>}
+                      {s.sleep&&<span style={{fontSize:12,color:T.muted}}>Sommeil <strong style={{color:T.text}}>{s.sleep}/5</strong></span>}
+                      {s.energy&&<span style={{fontSize:12,color:T.muted}}>Énergie <strong style={{color:T.text}}>{s.energy}/5</strong></span>}
                     </div>
                   )}
 
@@ -885,7 +885,7 @@ export default function App() {
                             <span style={{fontWeight:600,fontSize:13,color:T.text}}>{e.name}</span>
                             {e.muscle&&<Tag T={T}>{e.muscle}</Tag>}
                             {e.equipment&&<span style={{fontSize:11,color:T.muted,background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:99,padding:"2px 7px"}}>{equipLabel(e.equipment)}</span>}
-                            {isPR&&<span style={{fontSize:11,color:"#f59e0b",fontWeight:700}}>🏆 PR</span>}
+                            {isPR&&<span style={{fontSize:10,color:"#f59e0b",fontWeight:700,background:"#f59e0b18",border:"1px solid #f59e0b",borderRadius:99,padding:"1px 6px"}}>PR</span>}
                           </div>
                           {working.length>0&&(
                             <div style={{fontSize:12,color:T.text,marginBottom:4,lineHeight:1.8,fontVariantNumeric:"tabular-nums"}}>
@@ -907,12 +907,12 @@ export default function App() {
                             {bestORM>0&&<span>1RM: <strong style={{color:T.accent}}>{bestORM} kg</strong></span>}
                             {restTimes.length>0&&<span>⏱ {restTimes.join(" · ")}</span>}
                           </div>
-                          {e.notes&&<div style={{fontSize:11,color:T.muted,marginTop:4,fontStyle:"italic"}}>💬 {e.notes}</div>}
+                          {e.notes&&<div style={{fontSize:11,color:T.muted,marginTop:4,fontStyle:"italic"}}>{e.notes}</div>}
                         </div>
                       );
                     })}
                   </div>
-                  {s.notes&&<div style={{borderTop:`1px solid ${T.border}`,paddingTop:8,fontSize:12,color:T.muted,fontStyle:"italic"}}>📝 {s.notes}</div>}
+                  {s.notes&&<div style={{borderTop:`1px solid ${T.border}`,paddingTop:8,fontSize:12,color:T.muted,fontStyle:"italic"}}>{s.notes}</div>}
                 </div>
               );
             })}
@@ -926,7 +926,7 @@ export default function App() {
             {bwData.length>=2&&(
               <div style={S.card}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                  <p style={{margin:0,fontSize:13,fontWeight:600,color:T.text}}>⚖️ Poids de corps</p>
+                  <p style={{margin:0,fontSize:13,fontWeight:600,color:T.text}}>Poids de corps</p>
                   <div style={{display:"flex",gap:12,fontSize:12}}>
                     <span style={{color:T.muted}}>Min <strong style={{color:T.text}}>{Math.min(...bwData.map(d=>d.weight))}kg</strong></span>
                     <span style={{color:T.muted}}>Max <strong style={{color:T.text}}>{Math.max(...bwData.map(d=>d.weight))}kg</strong></span>
@@ -967,8 +967,8 @@ export default function App() {
                   <div style={{...S.card,padding:"14px 16px",marginBottom:12}}>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:0}}>
                       {[
-                        {label:"🏆 Record",value:`${Math.max(...progressData.map(d=>d.maxWeight))} kg`,sub:formatDate(best.date)},
-                        {label:"💡 1RM estimé",value:`${Math.max(...progressData.map(d=>d.orm))} kg`,sub:"Brzycki"},
+                        {label:"Record",value:`${Math.max(...progressData.map(d=>d.maxWeight))} kg`,sub:formatDate(best.date)},
+                        {label:"1RM estimé",value:`${Math.max(...progressData.map(d=>d.orm))} kg`,sub:"Brzycki"},
                         {label:"📈 vs dernière",value:diff===null?"—":diff>=0?`+${diff} kg`:`${diff} kg`,sub:prev?formatDate(prev.date):"",accent:diff===null?T.muted:diff>0?T.accent:diff<0?T.danger:T.muted},
                       ].map(({label,value,sub,accent},i)=>(
                         <div key={i} style={{textAlign:"center",padding:"4px 0",borderRight:i<2?`1px solid ${T.border}`:"none"}}>
@@ -998,8 +998,8 @@ export default function App() {
                         <Tooltip contentStyle={{background:T.bgModal,border:`1px solid ${T.border}`,borderRadius:8,fontSize:12,color:T.text}} labelStyle={{color:T.text}}
                           formatter={(val,name,{payload})=>{
                             const extra=name==="Poids max"&&payload.avgRPE?` (RPE ${payload.avgRPE})`:"";
-                            const emoji=name==="Poids max"&&payload.rating?` ${ratingEmojis[payload.rating-1]}`:"";
-                            return [`${val} kg${extra}${emoji}`,name];
+                            const label=name==="Poids max"&&payload.rating?` — ${ratingLabels[payload.rating-1]}`:"";
+                            return [`${val} kg${extra}${label}`,name];
                           }}
                         />
                         <Line type="monotone" dataKey="maxWeight" name="Poids max" stroke={T.accent} strokeWidth={2.5}
@@ -1008,7 +1008,7 @@ export default function App() {
                       </LineChart></ResponsiveContainer>
                     </div>
                     <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
-                      {[1,2,3,4,5].map(n=><span key={n} style={{fontSize:10,color:T.muted,display:"flex",alignItems:"center",gap:3}}><span style={{display:"inline-block",width:8,height:8,borderRadius:"50%",background:ratingColors[n-1]}}></span>{ratingEmojis[n-1]}</span>)}
+                      {[1,2,3,4,5].map(n=><span key={n} style={{fontSize:10,color:T.muted,display:"flex",alignItems:"center",gap:3}}><span style={{display:"inline-block",width:8,height:8,borderRadius:"50%",background:ratingColors[n-1]}}></span>{ratingLabels[n-1]}</span>)}
                     </div>
                   </div>
 
@@ -1043,7 +1043,7 @@ export default function App() {
                             <td style={{padding:"6px 8px",color:T.muted}}>{Math.round(d.volume)} kg</td>
                             <td style={{padding:"6px 8px",color:T.muted}}>{d.orm} kg</td>
                             <td style={{padding:"6px 8px",color:T.muted}}>{d.avgRPE||"—"}</td>
-                            <td style={{padding:"6px 8px"}}>{d.rating?<span style={{color:ratingColors[d.rating-1]}}>{ratingEmojis[d.rating-1]}</span>:"—"}</td>
+                            <td style={{padding:"6px 8px"}}>{d.rating?<span style={{color:ratingColors[d.rating-1],fontWeight:600,fontSize:11}}>{ratingLabels[d.rating-1]}</span>:"—"}</td>
                           </tr>
                         ))}</tbody>
                       </table>
@@ -1072,8 +1072,8 @@ export default function App() {
                     <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:6}}>{p.muscles.map(m=><Tag key={m} T={T}>{m}</Tag>)}</div>
                   </div>
                   <div style={{display:"flex",gap:6}}>
-                    <button onClick={()=>setEditingProgram(p)} style={{...S.btnS,padding:"5px 10px"}}>✏️</button>
-                    <button onClick={()=>setConfirmDelete(p)} style={{...S.btnD,padding:"5px 10px"}}>🗑️</button>
+                    <button onClick={()=>setEditingProgram(p)} style={{...S.btnS,padding:"5px 10px"}}>Modifier</button>
+                    <button onClick={()=>setConfirmDelete(p)} style={{...S.btnD,padding:"5px 10px"}}>Suppr.</button>
                   </div>
                 </div>
                 <div style={{borderTop:`1px solid ${T.border}`,paddingTop:8}}>
@@ -1109,7 +1109,7 @@ export default function App() {
               <StatCard label="Ce mois" value={thisMonth} T={T}/>
               <StatCard label="Volume total" value={totalVolume>=1000?(totalVolume/1000).toFixed(1)+" t":totalVolume+" kg"} T={T}/>
               <StatCard label="Durée moy." value={avgDuration?avgDuration+" min":"—"} T={T}/>
-              <StatCard label={`🔥 Streak`} value={trainingStreak} sub={trainingStreak>1?"semaines consécutives":"semaine"} T={T}/>
+              <StatCard label="Streak" value={trainingStreak} sub={trainingStreak>1?"semaines consécutives":"semaine"} T={T}/>
             </div>
 
             {/* Weekly volume trend */}
@@ -1157,7 +1157,7 @@ export default function App() {
                 <p style={{margin:"0 0 4px",fontSize:13,fontWeight:600,color:T.text}}>Forme & récupération moyennes</p>
                 <p style={{margin:"0 0 14px",fontSize:11,color:T.muted}}>Basé sur tes {wellnessStats.count} dernières séances renseignées</p>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
-                  {[{label:"😊 Ressenti",val:wellnessStats.rating,max:5},{label:"💤 Sommeil",val:wellnessStats.sleep,max:5},{label:"⚡ Énergie",val:wellnessStats.energy,max:5}].map(({label,val,max})=>(
+                  {[{label:"Ressenti",val:wellnessStats.rating,max:5},{label:"Sommeil",val:wellnessStats.sleep,max:5},{label:"Énergie",val:wellnessStats.energy,max:5}].map(({label,val,max})=>(
                     <div key={label} style={{textAlign:"center",padding:10,background:T.bgInput,borderRadius:10,border:`1px solid ${T.border}`}}>
                       <div style={{fontSize:11,color:T.muted,marginBottom:6}}>{label}</div>
                       <div style={{fontSize:20,fontWeight:800,color:val==="—"?T.muted:parseFloat(val)>=4?T.accent:parseFloat(val)>=3?"#f59e0b":T.danger}}>{val}{val!=="—"?"/5":""}</div>
@@ -1257,11 +1257,11 @@ export default function App() {
               <p style={{margin:"0 0 4px",fontSize:14,fontWeight:600,color:T.text}}>Sauvegarde & données</p>
               <p style={{margin:"0 0 12px",fontSize:12,color:T.muted}}>Tes données sont enregistrées automatiquement. Exporte pour transférer ou archiver.</p>
               <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:8}}>
-                <button onClick={exportJSON} style={S.btnP}>⬇️ Export JSON</button>
-                <button onClick={exportCSV} style={{...S.btnS,padding:"8px 16px"}}>⬇️ Export CSV</button>
+                <button onClick={exportJSON} style={S.btnP}>Export JSON</button>
+                <button onClick={exportCSV} style={{...S.btnS,padding:"8px 16px"}}>Export CSV</button>
               </div>
-              <label style={{...S.btnS,padding:"8px 16px",display:"inline-block",cursor:"pointer"}}>⬆️ Importer JSON<input type="file" accept=".json" onChange={importJSON} style={{display:"none"}}/></label>
-              {importSuccess&&<p style={{margin:"10px 0 0",fontSize:12,color:T.accent}}>✅ Import réussi !</p>}
+              <label style={{...S.btnS,padding:"8px 16px",display:"inline-block",cursor:"pointer"}}>Importer JSON<input type="file" accept=".json" onChange={importJSON} style={{display:"none"}}/></label>
+              {importSuccess&&<p style={{margin:"10px 0 0",fontSize:12,color:T.accent}}>Import réussi !</p>}
               {importError&&<p style={{margin:"10px 0 0",fontSize:12,color:T.danger}}>❌ {importError}</p>}
             </div>
           </div>
