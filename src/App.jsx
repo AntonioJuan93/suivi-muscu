@@ -6,6 +6,15 @@ import { supabase } from "./supabase";
 import { loadCloud, saveCloud, clearCloudCache } from "./cloud";
 import Auth from "./Auth";
 
+const EQUIPMENT = [
+  {v:"",l:"Équipement..."},
+  {v:"barre",l:"🏋️ Barre"},
+  {v:"alteres",l:"💪 Altères"},
+  {v:"poulie",l:"🔗 Poulie"},
+  {v:"machine",l:"⚙️ Machine guidée"},
+];
+function equipLabel(v){ return EQUIPMENT.find(e=>e.v===v)?.l||""; }
+
 function Tag({ children, T }) {
   return <span style={{ fontSize:11, background:T.accentDim, color:T.accent, padding:"2px 8px", borderRadius:99 }}>{children}</span>;
 }
@@ -45,17 +54,18 @@ function ProgramEditor({ program, onSave, onCancel, T, S }) {
   const [muscles, setMuscles] = useState(program?.muscles||[]);
   const [exercises, setExercises] = useState(
     (program?.exercises||[]).map(ex =>
-      typeof ex === "string" ? { name:ex, targetSets:"", targetReps:"", muscle:"" } : { muscle:"", ...ex }
+      typeof ex === "string" ? { name:ex, targetSets:"", targetReps:"", muscle:"", equipment:"" } : { muscle:"", equipment:"", ...ex }
     )
   );
   const [newEx, setNewEx] = useState("");
   const [newExMuscle, setNewExMuscle] = useState("");
+  const [newExEquip, setNewExEquip] = useState("");
 
   function toggleMuscle(m) { setMuscles(ms=>ms.includes(m)?ms.filter(x=>x!==m):[...ms,m]); }
   function addEx() {
     if(!newEx.trim())return;
-    setExercises(ex=>[...ex,{name:newEx.trim(),targetSets:"",targetReps:"",muscle:newExMuscle}]);
-    setNewEx(""); setNewExMuscle("");
+    setExercises(ex=>[...ex,{name:newEx.trim(),targetSets:"",targetReps:"",muscle:newExMuscle,equipment:newExEquip}]);
+    setNewEx(""); setNewExMuscle(""); setNewExEquip("");
   }
   function removeEx(i) { setExercises(ex=>ex.filter((_,j)=>j!==i)); }
   function moveEx(i,dir) { setExercises(ex=>{ const a=[...ex],j=i+dir; if(j<0||j>=a.length)return a; [a[i],a[j]]=[a[j],a[i]]; return a; }); }
@@ -89,10 +99,15 @@ function ProgramEditor({ program, onSave, onCancel, T, S }) {
               <span style={{ flex:1, fontSize:13, color:T.text, fontWeight:500 }}>{ex.name}</span>
               <button onClick={()=>removeEx(i)} style={{ background:"none", border:"none", cursor:"pointer", color:T.danger, fontSize:16, lineHeight:1 }}>✕</button>
             </div>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 52px 6px 1fr", gap:6, alignItems:"center" }}>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6, marginBottom:6 }}>
               <select value={ex.muscle||""} onChange={e=>updateExField(i,"muscle",e.target.value)} style={{ ...S.inp, fontSize:12, padding:"6px 8px" }}>
                 {allMuscleOpts.map(m=><option key={m} value={m}>{m||"Muscle..."}</option>)}
               </select>
+              <select value={ex.equipment||""} onChange={e=>updateExField(i,"equipment",e.target.value)} style={{ ...S.inp, fontSize:12, padding:"6px 8px" }}>
+                {EQUIPMENT.map(eq=><option key={eq.v} value={eq.v}>{eq.l}</option>)}
+              </select>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"52px 10px 1fr", gap:6, alignItems:"center" }}>
               <input type="number" value={ex.targetSets||""} onChange={e=>updateExField(i,"targetSets",e.target.value)} placeholder="Sér." min="1" style={{ ...S.inp, fontSize:12, padding:"6px 6px", textAlign:"center" }} title="Nombre de séries" />
               <span style={{ fontSize:11, color:T.muted, textAlign:"center" }}>×</span>
               <input value={ex.targetReps||""} onChange={e=>updateExField(i,"targetReps",e.target.value)} placeholder="Reps (6-8, 5, 10-12)" style={{ ...S.inp, fontSize:12, padding:"6px 8px" }} title="Fourchette de répétitions" />
@@ -100,12 +115,17 @@ function ProgramEditor({ program, onSave, onCancel, T, S }) {
           </div>
         ))}
 
-        <div style={{ display:"flex", gap:6, marginBottom:20, marginTop:8, flexWrap:"wrap" }}>
+        <div style={{ display:"flex", gap:6, marginBottom:8, marginTop:8, flexWrap:"wrap" }}>
           <input value={newEx} onChange={e=>setNewEx(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addEx()} placeholder="Nom de l'exercice" style={{ ...S.inp, flex:2, minWidth:120 }} />
+          <button onClick={addEx} style={{ ...S.btnP, whiteSpace:"nowrap" }}>+ Ajouter</button>
+        </div>
+        <div style={{ display:"flex", gap:6, marginBottom:20, flexWrap:"wrap" }}>
           <select value={newExMuscle} onChange={e=>setNewExMuscle(e.target.value)} style={{ ...S.inp, flex:1, minWidth:110 }}>
             {allMuscleOpts.map(m=><option key={m} value={m}>{m||"Muscle..."}</option>)}
           </select>
-          <button onClick={addEx} style={{ ...S.btnP, whiteSpace:"nowrap" }}>+ Ajouter</button>
+          <select value={newExEquip} onChange={e=>setNewExEquip(e.target.value)} style={{ ...S.inp, flex:1, minWidth:110 }}>
+            {EQUIPMENT.map(eq=><option key={eq.v} value={eq.v}>{eq.l}</option>)}
+          </select>
         </div>
 
         <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
@@ -158,6 +178,7 @@ export default function App() {
   const [exercises, setExercises] = useState([]);
   const [newExName, setNewExName] = useState("");
   const [newExMuscle, setNewExMuscle] = useState(MUSCLE_GROUPS[0]);
+  const [newExEquipment, setNewExEquipment] = useState("");
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(true);
@@ -345,8 +366,9 @@ export default function App() {
       const sugg = getSuggestion(name, targetReps);
       const defaultWeight = sugg ? String(sugg.weight) : "";
       const defaultReps = targetReps ? targetReps.split("-")[0] : "";
+      const equipment = typeof ex==="object"&&ex.equipment ? ex.equipment : "";
       const sets = Array.from({length:targetSets},()=>({weight:defaultWeight,reps:defaultReps,rpe:"",isWarmup:false,restMs:null}));
-      return {id:now+i, name, muscle, notes:"", sets, target:{sets:targetSets,reps:targetReps}};
+      return {id:now+i, name, muscle, equipment, notes:"", sets, target:{sets:targetSets,reps:targetReps}};
     }));
   }
 
@@ -357,7 +379,7 @@ export default function App() {
     setSessionBodyweight(""); setSessionRating(null); setSessionSleep(null); setSessionEnergy(null);
     const now = Date.now();
     setExercises(s.exercises.map((e,i)=>({
-      id:now+i, name:e.name, muscle:e.muscle, notes:"",
+      id:now+i, name:e.name, muscle:e.muscle, equipment:e.equipment||"", notes:"",
       sets:(e.sets||[]).map(st=>({weight:st.weight,reps:st.reps,rpe:"",isWarmup:st.isWarmup||false,restMs:null}))
     })));
     setTab("log");
@@ -390,10 +412,10 @@ export default function App() {
 
   function addExercise(nameOverride) {
     const name=(nameOverride||newExName).trim(); if(!name)return;
-    let muscle=newExMuscle;
-    for(const s of sessions){ const f=s.exercises.find(e=>e.name===name); if(f){muscle=f.muscle;break;} }
-    setExercises(ex=>[...ex,{id:Date.now(),name,muscle,notes:"",sets:[{weight:"",reps:"",rpe:"",isWarmup:false,restMs:null}]}]);
-    setNewExName("");
+    let muscle=newExMuscle, equipment=newExEquipment;
+    for(const s of sessions){ const f=s.exercises.find(e=>e.name===name); if(f){ muscle=f.muscle; equipment=f.equipment||""; break; } }
+    setExercises(ex=>[...ex,{id:Date.now(),name,muscle,equipment,notes:"",sets:[{weight:"",reps:"",rpe:"",isWarmup:false,restMs:null}]}]);
+    setNewExName(""); setNewExEquipment("");
   }
 
   function saveSession() {
@@ -615,6 +637,7 @@ export default function App() {
                     <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                       <span style={{fontWeight:600,fontSize:14,color:T.text}}>{ex.name}</span>
                       <Tag T={T}>{ex.muscle}</Tag>
+                      {ex.equipment && <span style={{fontSize:11,color:T.muted,background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:99,padding:"2px 8px"}}>{equipLabel(ex.equipment)}</span>}
                       {ex.target?.reps && <span style={{fontSize:11,color:T.muted,background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:99,padding:"2px 8px"}}>🎯 {ex.target.sets?`${ex.target.sets}×`:""}  {ex.target.reps}</span>}
                     </div>
                     <button onClick={()=>removeExercise(ex.id)} style={{...S.btnS,padding:"3px 8px",fontSize:11}}>✕</button>
@@ -718,10 +741,15 @@ export default function App() {
                 </div></>
               )}
               <p style={{fontSize:11,color:T.muted,margin:"0 0 6px"}}>Nouvel exercice</p>
-              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                <input value={newExName} onChange={e=>setNewExName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addExercise()} placeholder="Nom de l'exercice" style={{...S.inp,flex:1,minWidth:150}}/>
-                <select value={newExMuscle} onChange={e=>setNewExMuscle(e.target.value)} style={{...S.inp,minWidth:130,width:"auto"}}>{MUSCLE_GROUPS.map(m=><option key={m}>{m}</option>)}</select>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:6}}>
+                <input value={newExName} onChange={e=>setNewExName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addExercise()} placeholder="Nom de l'exercice" style={{...S.inp,flex:2,minWidth:150}}/>
                 <button onClick={()=>addExercise()} style={S.btnP}>Ajouter</button>
+              </div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <select value={newExMuscle} onChange={e=>setNewExMuscle(e.target.value)} style={{...S.inp,flex:1,minWidth:120}}>{MUSCLE_GROUPS.map(m=><option key={m}>{m}</option>)}</select>
+                <select value={newExEquipment} onChange={e=>setNewExEquipment(e.target.value)} style={{...S.inp,flex:1,minWidth:120}}>
+                  {EQUIPMENT.map(eq=><option key={eq.v} value={eq.v}>{eq.l}</option>)}
+                </select>
               </div>
             </div>
 
@@ -832,6 +860,7 @@ export default function App() {
                           <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5,flexWrap:"wrap"}}>
                             <span style={{fontWeight:600,fontSize:13,color:T.text}}>{e.name}</span>
                             {e.muscle&&<Tag T={T}>{e.muscle}</Tag>}
+                            {e.equipment&&<span style={{fontSize:11,color:T.muted,background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:99,padding:"2px 7px"}}>{equipLabel(e.equipment)}</span>}
                             {isPR&&<span style={{fontSize:11,color:"#f59e0b",fontWeight:700}}>🏆 PR</span>}
                           </div>
                           {working.length>0&&(
