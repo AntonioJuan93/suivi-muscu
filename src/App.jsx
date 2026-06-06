@@ -14,6 +14,7 @@ const EQUIPMENT = [
   {v:"machine",l:"⚙️ Machine guidée"},
 ];
 function equipLabel(v){ return EQUIPMENT.find(e=>e.v===v)?.l||""; }
+function exKey(name,equip){ return name+(equip?":::"+equip:""); }
 
 function Tag({ children, T }) {
   return <span style={{ fontSize:11, background:T.accentDim, color:T.accent, padding:"2px 8px", borderRadius:99 }}>{children}</span>;
@@ -156,7 +157,7 @@ export default function App() {
   const [importError, setImportError] = useState(null);
   const [importSuccess, setImportSuccess] = useState(false);
   const [historyFilter, setHistoryFilter] = useState("");
-  const [progressEx, setProgressEx] = useState("");
+  const [progressKey, setProgressKey] = useState("");
   const [activeRest, setActiveRest] = useState(null);
   const [liveNow, setLiveNow] = useState(Date.now());
 
@@ -219,11 +220,11 @@ export default function App() {
     return 1.0;
   }
 
-  function getLastForExercise(name) {
+  function getLastForExercise(name, equipment) {
     const sorted = [...sessions].sort((a,b)=>b.date.localeCompare(a.date));
-    const lastS = sorted.find(s=>s.exercises.some(e=>e.name===name));
+    const lastS = sorted.find(s=>s.exercises.some(e=>e.name===name&&(e.equipment||"")===(equipment||"")));
     if (!lastS) return null;
-    const ex = lastS.exercises.find(e=>e.name===name);
+    const ex = lastS.exercises.find(e=>e.name===name&&(e.equipment||"")===(equipment||""));
     const working = (ex.sets||[]).filter(s=>!s.isWarmup && (s.weight||s.reps));
     const daysAgo = Math.round((Date.now()-new Date(lastS.date))/86400000);
     const maxW = Math.max(0,...working.map(s=>parseFloat(s.weight)||0));
@@ -231,8 +232,8 @@ export default function App() {
     return { daysAgo, date:lastS.date, sets:working, maxWeight:maxW, repsPerSet };
   }
 
-  function getSuggestion(name, targetReps) {
-    const last = getLastForExercise(name);
+  function getSuggestion(name, equipment, targetReps) {
+    const last = getLastForExercise(name, equipment);
     if (!last || !last.maxWeight) return null;
 
     const [minR, maxR] = parseRepRange(targetReps);
@@ -447,21 +448,32 @@ export default function App() {
 
   // ── Computed ──────────────────────────────────────────────────────────────
   const allExNames=[...new Set(sessions.flatMap(s=>s.exercises.map(e=>e.name)))].sort();
+  const progressEx = progressKey ? progressKey.split(":::")[0] : "";
+  const progressEquip = progressKey ? (progressKey.split(":::")[1]||"") : "";
+  const allExVariants=useMemo(()=>{
+    const seen=new Set(); const result=[];
+    sessions.forEach(s=>s.exercises.forEach(e=>{
+      const k=exKey(e.name,e.equipment||"");
+      if(!seen.has(k)){ seen.add(k); result.push({name:e.name,equipment:e.equipment||"",key:k}); }
+    }));
+    return result.sort((a,b)=>a.name.localeCompare(b.name)||a.equipment.localeCompare(b.equipment));
+  },[sessions]);
   const now=new Date(), weekStart=startOfWeek(now);
 
   const prSet=useMemo(()=>{
     const best={},prs=new Set();
     [...sessions].sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id).forEach(s=>
       s.exercises.forEach(e=>{
+        const k=exKey(e.name,e.equipment||"");
         const mw=Math.max(0,...(e.sets||[]).filter(st=>!st.isWarmup).map(st=>parseFloat(st.weight)||0));
-        if(mw>0&&mw>(best[e.name]||0)){best[e.name]=mw; prs.add(s.id+":"+e.name);}
+        if(mw>0&&mw>(best[k]||0)){best[k]=mw; prs.add(s.id+":"+k);}
       })
     );
     return prs;
   },[sessions]);
 
   const progressData=useMemo(()=>
-    sessions.flatMap(s=>s.exercises.filter(e=>e.name===progressEx).map(e=>{
+    sessions.flatMap(s=>s.exercises.filter(e=>e.name===progressEx&&(e.equipment||"")===(progressEquip||"")).map(e=>{
       const working=(e.sets||[]).filter(st=>!st.isWarmup);
       const withRPE=working.filter(st=>st.rpe);
       const avgRPE=withRPE.length?Math.round(withRPE.reduce((a,st)=>a+(parseFloat(st.rpe)||0),0)/withRPE.length*10)/10:null;
@@ -471,7 +483,7 @@ export default function App() {
         orm:Math.max(0,...working.map(st=>estimate1RM(st.weight,st.reps))),
         rating:s.rating, sleep:s.sleep, energy:s.energy, avgRPE};
     })).sort((a,b)=>a.date.localeCompare(b.date))
-  ,[sessions, progressEx]);
+  ,[sessions, progressKey]);
 
   const bwData=useMemo(()=>
     [...sessions].filter(s=>s.bodyweight).map(s=>({date:s.date,label:formatDate(s.date),weight:parseFloat(s.bodyweight)||0}))
@@ -629,15 +641,17 @@ export default function App() {
             )}
 
             {exercises.map(ex=>{
-              const last=getLastForExercise(ex.name);
-              const sugg=getSuggestion(ex.name, ex.target?.reps);
+              const last=getLastForExercise(ex.name, ex.equipment);
+              const sugg=getSuggestion(ex.name, ex.equipment, ex.target?.reps);
               return (
                 <div key={ex.id} style={S.card}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                     <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                       <span style={{fontWeight:600,fontSize:14,color:T.text}}>{ex.name}</span>
                       <Tag T={T}>{ex.muscle}</Tag>
-                      {ex.equipment && <span style={{fontSize:11,color:T.muted,background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:99,padding:"2px 8px"}}>{equipLabel(ex.equipment)}</span>}
+                      <select value={ex.equipment||""} onChange={e=>setExercises(xs=>xs.map(x=>x.id===ex.id?{...x,equipment:e.target.value}:x))} style={{fontSize:11,color:T.muted,background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:99,padding:"2px 7px",cursor:"pointer",outline:"none"}}>
+                        {EQUIPMENT.map(eq=><option key={eq.v} value={eq.v}>{eq.l}</option>)}
+                      </select>
                       {ex.target?.reps && <span style={{fontSize:11,color:T.muted,background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:99,padding:"2px 8px"}}>🎯 {ex.target.sets?`${ex.target.sets}×`:""}  {ex.target.reps}</span>}
                     </div>
                     <button onClick={()=>removeExercise(ex.id)} style={{...S.btnS,padding:"3px 8px",fontSize:11}}>✕</button>
@@ -854,7 +868,7 @@ export default function App() {
                       const avgRPE=withRPE.length?(withRPE.reduce((a,st)=>a+(parseFloat(st.rpe)||0),0)/withRPE.length).toFixed(1):null;
                       const bestORM=Math.max(0,...working.map(st=>estimate1RM(st.weight,st.reps)));
                       const restTimes=working.filter(st=>st.restMs&&st.restMs>5000).map(st=>formatRest(st.restMs)).filter(Boolean);
-                      const isPR=prSet.has(s.id+":"+e.name);
+                      const isPR=prSet.has(s.id+":"+exKey(e.name,e.equipment||""));
                       return (
                         <div key={i} style={{marginBottom:10,paddingBottom:10,borderBottom:i<s.exercises.length-1?`1px solid ${T.border}`:"none"}}>
                           <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5,flexWrap:"wrap"}}>
@@ -924,9 +938,11 @@ export default function App() {
             {/* Exercise selector */}
             <div style={{marginBottom:16}}>
               <label style={{fontSize:12,color:T.muted,display:"block",marginBottom:6}}>Exercice à analyser</label>
-              <select value={progressEx} onChange={e=>setProgressEx(e.target.value)} style={S.inp}>
+              <select value={progressKey} onChange={e=>setProgressKey(e.target.value)} style={S.inp}>
                 <option value="">-- Choisir un exercice --</option>
-                {allExNames.map(n=><option key={n}>{n}</option>)}
+                {allExVariants.map(v=>(
+                  <option key={v.key} value={v.key}>{v.name}{v.equipment?` — ${equipLabel(v.equipment)}`:""}</option>
+                ))}
               </select>
             </div>
 
