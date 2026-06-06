@@ -1,8 +1,25 @@
-export const MUSCLE_GROUPS = ["Pectoraux","Dos","Épaules","Biceps","Triceps","Quadriceps","Ischio-jambiers","Mollets","Abdos","Fessiers"];
+export const MUSCLE_GROUPS = [
+  "Pectoraux supérieurs",
+  "Pectoraux",
+  "Pectoraux inférieurs",
+  "Grand dorsaux",
+  "Trapèzes",
+  "Lombaires",
+  "Épaules antérieures",
+  "Épaules latérales",
+  "Épaules postérieures",
+  "Biceps",
+  "Triceps",
+  "Quadriceps",
+  "Ischio-jambiers",
+  "Mollets",
+  "Abdos",
+  "Fessiers",
+];
 
 export const INITIAL_PROGRAMS = [
-  { id:1, name:"Push (Poussée)", muscles:["Pectoraux","Épaules","Triceps"], exercises:["Développé couché","Développé militaire","Écarté poulie","Triceps poulie"] },
-  { id:2, name:"Pull (Tirage)", muscles:["Dos","Biceps"], exercises:["Tractions","Rowing barre","Curl barre","Tirage poulie haute"] },
+  { id:1, name:"Push (Poussée)", muscles:["Pectoraux","Pectoraux supérieurs","Épaules antérieures","Épaules latérales","Triceps"], exercises:["Développé couché","Développé militaire","Écarté poulie","Triceps poulie"] },
+  { id:2, name:"Pull (Tirage)", muscles:["Grand dorsaux","Trapèzes","Biceps"], exercises:["Tractions","Rowing barre","Curl barre","Tirage poulie haute"] },
   { id:3, name:"Legs (Jambes)", muscles:["Quadriceps","Ischio-jambiers","Mollets","Fessiers"], exercises:["Squat","Presse à cuisses","Fentes","Leg curl","Hip thrust","Mollets debout"] },
 ];
 
