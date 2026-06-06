@@ -5,7 +5,6 @@ import { loadData, saveData } from "./storage";
 import { supabase } from "./supabase";
 import { loadCloud, saveCloud, clearCloudCache } from "./cloud";
 import Auth from "./Auth";
-import RestTimer from "./RestTimer";
 
 function Tag({ children, T }) {
   return <span style={{ fontSize:11, background:T.accentDim, color:T.accent, padding:"2px 8px", borderRadius:99 }}>{children}</span>;
@@ -138,8 +137,7 @@ export default function App() {
   const [importSuccess, setImportSuccess] = useState(false);
   const [historyFilter, setHistoryFilter] = useState("");
   const [progressEx, setProgressEx] = useState("");
-  const [showTimer, setShowTimer] = useState(false);
-  const [timerTrigger, setTimerTrigger] = useState(0);
+  const [activeRest, setActiveRest] = useState(null);
   const [liveNow, setLiveNow] = useState(Date.now());
 
   // ── Data ──────────────────────────────────────────────────────────────────
@@ -347,7 +345,7 @@ export default function App() {
       const sugg = getSuggestion(name, targetReps);
       const defaultWeight = sugg ? String(sugg.weight) : "";
       const defaultReps = targetReps ? targetReps.split("-")[0] : "";
-      const sets = Array.from({length:targetSets},()=>({weight:defaultWeight,reps:defaultReps,rpe:"",isWarmup:false,addedAt:now}));
+      const sets = Array.from({length:targetSets},()=>({weight:defaultWeight,reps:defaultReps,rpe:"",isWarmup:false,restMs:null}));
       return {id:now+i, name, muscle, notes:"", sets, target:{sets:targetSets,reps:targetReps}};
     }));
   }
@@ -360,15 +358,30 @@ export default function App() {
     const now = Date.now();
     setExercises(s.exercises.map((e,i)=>({
       id:now+i, name:e.name, muscle:e.muscle, notes:"",
-      sets:(e.sets||[]).map(st=>({weight:st.weight,reps:st.reps,rpe:"",isWarmup:st.isWarmup||false,addedAt:null}))
+      sets:(e.sets||[]).map(st=>({weight:st.weight,reps:st.reps,rpe:"",isWarmup:st.isWarmup||false,restMs:null}))
     })));
     setTab("log");
   }
 
   function addSet(id) {
     const now = Date.now();
-    setExercises(ex=>ex.map(e=>e.id===id?{...e,sets:[...e.sets,{weight:"",reps:"",rpe:"",isWarmup:false,addedAt:now}]}:e));
-    setTimerTrigger(k=>k+1);
+    setExercises(ex=>ex.map(e=>{
+      if(e.id!==id) return e;
+      let sets=e.sets;
+      if(activeRest&&activeRest.exId===id){
+        const elapsed=now-activeRest.startTime;
+        sets=sets.map((st,i)=>i===activeRest.si?{...st,restMs:elapsed}:st);
+      }
+      return {...e,sets:[...sets,{weight:"",reps:"",rpe:"",isWarmup:false,restMs:null}]};
+    }));
+    if(activeRest&&activeRest.exId===id) setActiveRest(null);
+  }
+  function startRest(exId,si){ setActiveRest({exId,si,startTime:Date.now()}); }
+  function stopRest(){
+    if(!activeRest) return;
+    const elapsed=Date.now()-activeRest.startTime;
+    updateSet(activeRest.exId,activeRest.si,"restMs",elapsed);
+    setActiveRest(null);
   }
   function removeSet(id,si){ setExercises(ex=>ex.map(e=>e.id===id?{...e,sets:e.sets.filter((_,i)=>i!==si)}:e)); }
   function updateSet(id,si,f,v){ setExercises(ex=>ex.map(e=>e.id===id?{...e,sets:e.sets.map((st,i)=>i===si?{...st,[f]:v}:st)}:e)); }
@@ -379,7 +392,7 @@ export default function App() {
     const name=(nameOverride||newExName).trim(); if(!name)return;
     let muscle=newExMuscle;
     for(const s of sessions){ const f=s.exercises.find(e=>e.name===name); if(f){muscle=f.muscle;break;} }
-    setExercises(ex=>[...ex,{id:Date.now(),name,muscle,notes:"",sets:[{weight:"",reps:"",rpe:"",isWarmup:false,addedAt:Date.now()}]}]);
+    setExercises(ex=>[...ex,{id:Date.now(),name,muscle,notes:"",sets:[{weight:"",reps:"",rpe:"",isWarmup:false,restMs:null}]}]);
     setNewExName("");
   }
 
@@ -397,8 +410,7 @@ export default function App() {
   function exportCSV(){
     const rows=[["Date","Programme","Exercice","Muscle","Série","Échauffement","Poids","Reps","RPE","Volume","1RM","Repos (s)"]];
     sessions.forEach(s=>s.exercises.forEach(e=>e.sets.forEach((st,si)=>{
-      const prev=si>0?e.sets[si-1]:null;
-      const rest=prev&&st.addedAt&&prev.addedAt?Math.round((st.addedAt-prev.addedAt)/1000):"";
+      const rest=st.restMs?Math.round(st.restMs/1000):"";
       rows.push([s.date,s.programName,e.name,e.muscle,si+1,st.isWarmup?"oui":"non",st.weight||0,st.reps||0,st.rpe||"",(parseFloat(st.weight)||0)*(parseInt(st.reps)||0),estimate1RM(st.weight,st.reps),rest]);
     })));
     const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([rows.map(r=>r.map(v=>`"${v}"`).join(",")).join("\n")],{type:"text/csv"})); a.download="suivi_muscu.csv"; a.click();
@@ -654,14 +666,11 @@ export default function App() {
                     <span></span>
                   </div>
 
-                  {/* Sets — repos affiché sous chaque série */}
+                  {/* Sets avec chrono de repos manuel */}
                   {ex.sets.map((s,si)=>{
-                    const isLast = si === ex.sets.length - 1;
-                    // Repos après CETTE série = temps avant que la suivante soit ajoutée
-                    const nextSet = ex.sets[si+1];
-                    const restAfter = nextSet?.addedAt && s.addedAt ? formatRest(nextSet.addedAt - s.addedAt) : null;
-                    // Dernière série : chrono en direct
-                    const liveRestThis = isLast && s.addedAt ? formatRest(liveNow - s.addedAt) : null;
+                    const isLast=si===ex.sets.length-1;
+                    const isTimerActive=activeRest?.exId===ex.id&&activeRest?.si===si;
+                    const liveRestStr=isTimerActive?formatRest(liveNow-activeRest.startTime)||"0s":null;
                     return (
                       <div key={si}>
                         <div style={{display:"grid",gridTemplateColumns:"18px 22px 1fr 1fr 46px 50px 24px",gap:5,alignItems:"center",marginBottom:1,opacity:s.isWarmup?0.6:1}}>
@@ -673,18 +682,22 @@ export default function App() {
                           <span style={{fontSize:11,color:T.muted,textAlign:"right"}}>{estimate1RM(s.weight,s.reps)||"—"}</span>
                           <button onClick={()=>removeSet(ex.id,si)} style={{background:"none",border:"none",cursor:"pointer",color:T.muted,fontSize:13}}>✕</button>
                         </div>
-                        {/* Repos pris après cette série (historique) */}
-                        {restAfter && (
-                          <div style={{fontSize:10,color:T.muted,paddingLeft:20,paddingBottom:5,paddingTop:1,opacity:0.75}}>
-                            ⏱ Repos après S{si+1} : <strong>{restAfter}</strong>
+                        {/* Repos : enregistré | en cours | bouton démarrer */}
+                        {s.restMs&&s.restMs>0 ? (
+                          <div style={{fontSize:10,color:T.muted,paddingLeft:20,paddingBottom:5,display:"flex",alignItems:"center",gap:6}}>
+                            ⏱ Repos S{si+1} : <strong style={{color:T.text}}>{formatRest(s.restMs)}</strong>
+                            <button onClick={()=>updateSet(ex.id,si,"restMs",null)} style={{fontSize:9,color:T.muted,background:"none",border:"none",cursor:"pointer",opacity:0.5,padding:0}} title="Réinitialiser">↺</button>
                           </div>
-                        )}
-                        {/* Dernière série : repos en cours (live) */}
-                        {!restAfter && liveRestThis && (
-                          <div style={{fontSize:11,color:T.accent,paddingLeft:20,paddingBottom:5,paddingTop:1,fontWeight:600}}>
-                            ⏱ Repos S{si+1} en cours : {liveRestThis}
+                        ) : isTimerActive ? (
+                          <div style={{display:"flex",alignItems:"center",gap:8,paddingLeft:20,paddingBottom:6}}>
+                            <span style={{fontSize:14,fontWeight:700,color:T.accent,fontVariantNumeric:"tabular-nums"}}>⏱ {liveRestStr}</span>
+                            <button onClick={stopRest} style={{fontSize:11,color:T.onAccent,background:T.accent,border:"none",borderRadius:6,padding:"3px 10px",cursor:"pointer",fontWeight:600}}>Arrêter ⏹</button>
                           </div>
-                        )}
+                        ) : isLast&&!activeRest ? (
+                          <div style={{paddingLeft:20,paddingBottom:5}}>
+                            <button onClick={()=>startRest(ex.id,si)} style={{fontSize:11,color:T.muted,border:`1px solid ${T.border}`,borderRadius:6,padding:"3px 12px",background:"transparent",cursor:"pointer"}}>⏱ Démarrer le repos</button>
+                          </div>
+                        ) : null}
                       </div>
                     );
                   })}
@@ -750,46 +763,103 @@ export default function App() {
             {filteredSessions.length===0&&<p style={{color:T.muted,textAlign:"center",padding:"2rem 0",fontSize:14}}>Aucune séance.</p>}
             {filteredSessions.map(s=>{
               const vol=Math.round(s.exercises.reduce((a,e)=>a+wVolume(e.sets),0));
+              const totalWorkSets=s.exercises.reduce((a,e)=>a+(e.sets||[]).filter(st=>!st.isWarmup&&(st.weight||st.reps)).length,0);
               const muscles=[...new Set(s.exercises.map(e=>e.muscle))];
+              const prevSame=[...sessions].filter(ps=>ps.id!==s.id&&ps.programName===s.programName&&ps.date<s.date).sort((a,b)=>b.date.localeCompare(a.date))[0];
+              const prevVol=prevSame?Math.round(prevSame.exercises.reduce((a,e)=>a+wVolume(e.sets),0)):null;
+              const volDiff=prevVol!==null?vol-prevVol:null;
               return (
                 <div key={s.id} style={S.card}>
+                  {/* En-tête */}
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                     <div>
-                      <div style={{fontWeight:600,fontSize:14,color:T.text}}>{s.programName}</div>
-                      <div style={{fontSize:12,color:T.muted,marginTop:3,display:"flex",gap:8,flexWrap:"wrap"}}>
+                      <div style={{fontWeight:700,fontSize:15,color:T.text,marginBottom:4}}>{s.programName}</div>
+                      <div style={{fontSize:12,color:T.muted,display:"flex",gap:8,flexWrap:"wrap"}}>
                         <span>{formatDate(s.date)}{s.duration?` · ${s.duration} min`:""}</span>
-                        {s.bodyweight&&<span>⚖️ {s.bodyweight}kg</span>}
-                        {s.rating&&<span>{ratingEmojis[s.rating-1]} {["Difficile","Moyen","Bien","Super","Excellent"][s.rating-1]}</span>}
-                        {s.sleep&&<span>💤 {s.sleep}/5</span>}
-                        {s.energy&&<span>⚡ {s.energy}/5</span>}
+                        {s.bodyweight&&<span>⚖️ {s.bodyweight} kg</span>}
                       </div>
                     </div>
-                    <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
-                      <div style={{display:"flex",gap:6}}>
-                        <button onClick={()=>repeatSession(s)} style={{...S.btnS,padding:"3px 8px",fontSize:11}}>🔁</button>
-                        <button onClick={()=>setConfirmDelete(s)} style={{...S.btnD,padding:"3px 8px",fontSize:11}}>🗑️</button>
-                      </div>
-                      <div style={{textAlign:"right"}}><div style={{fontSize:15,fontWeight:600,color:T.accent}}>{vol.toLocaleString()} kg</div><div style={{fontSize:11,color:T.muted}}>volume</div></div>
+                    <div style={{display:"flex",gap:6}}>
+                      <button onClick={()=>repeatSession(s)} style={{...S.btnS,padding:"3px 8px",fontSize:11}}>🔁</button>
+                      <button onClick={()=>setConfirmDelete(s)} style={{...S.btnD,padding:"3px 8px",fontSize:11}}>🗑️</button>
                     </div>
                   </div>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>{muscles.map(m=><Tag key={m} T={T}>{m}</Tag>)}</div>
-                  <div style={{borderTop:`1px solid ${T.border}`,paddingTop:8}}>
-                    {s.exercises.map((e,i)=>{
-                      const working=(e.sets||[]).filter(st=>!st.isWarmup&&(st.weight||st.reps));
-                      const warmup=(e.sets||[]).filter(st=>st.isWarmup).length;
-                      const maxW=Math.max(0,...working.map(st=>parseFloat(st.weight)||0));
-                      return <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}>
-                        <span style={{color:T.text}}>{e.name}{prSet.has(s.id+":"+e.name)&&" 🏆"}</span>
-                        <span style={{color:T.muted}}>{working.length}×{warmup?` (+${warmup}W)`:""} @ {maxW}kg</span>
-                      </div>;
-                    })}
-                  </div>
-                  {(s.notes||s.exercises.some(e=>e.notes))&&(
-                    <div style={{marginTop:8,borderTop:`1px solid ${T.border}`,paddingTop:8}}>
-                      {s.notes&&<p style={{margin:"0 0 4px",fontSize:12,color:T.muted,fontStyle:"italic"}}>📝 {s.notes}</p>}
-                      {s.exercises.filter(e=>e.notes).map((e,i)=><p key={i} style={{margin:"0 0 2px",fontSize:11,color:T.muted}}>💬 <strong>{e.name}</strong> : {e.notes}</p>)}
+
+                  {/* Bien-être */}
+                  {(s.rating||s.sleep||s.energy)&&(
+                    <div style={{display:"flex",gap:12,marginBottom:10,padding:"7px 12px",background:T.bgInput,borderRadius:8,flexWrap:"wrap",alignItems:"center"}}>
+                      {s.rating&&<span style={{fontSize:13,color:ratingColors[s.rating-1],fontWeight:700}}>{ratingEmojis[s.rating-1]} {["Difficile","Moyen","Bien","Super","Excellent"][s.rating-1]}</span>}
+                      {s.sleep&&<span style={{fontSize:12,color:T.muted}}>💤 <strong style={{color:T.text}}>{s.sleep}/5</strong></span>}
+                      {s.energy&&<span style={{fontSize:12,color:T.muted}}>⚡ <strong style={{color:T.text}}>{s.energy}/5</strong></span>}
                     </div>
                   )}
+
+                  {/* Stats volume */}
+                  <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+                    <div style={{flex:1,minWidth:80,textAlign:"center",background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:8,padding:"6px 10px"}}>
+                      <div style={{fontSize:10,color:T.muted}}>Volume travail</div>
+                      <div style={{fontSize:16,fontWeight:700,color:T.accent}}>{vol.toLocaleString()} kg</div>
+                    </div>
+                    <div style={{flex:"0 0 auto",textAlign:"center",background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:8,padding:"6px 14px"}}>
+                      <div style={{fontSize:10,color:T.muted}}>Séries</div>
+                      <div style={{fontSize:16,fontWeight:700,color:T.text}}>{totalWorkSets}</div>
+                    </div>
+                    {volDiff!==null&&(
+                      <div style={{flex:1,minWidth:80,textAlign:"center",background:T.bgInput,border:`1px solid ${T.border}`,borderRadius:8,padding:"6px 10px"}}>
+                        <div style={{fontSize:10,color:T.muted}}>vs. {formatDate(prevSame.date)}</div>
+                        <div style={{fontSize:14,fontWeight:700,color:volDiff>=0?T.accent:T.danger}}>{volDiff>=0?"+":""}{volDiff.toLocaleString()} kg</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Muscles */}
+                  <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:10}}>
+                    {muscles.map(m=><Tag key={m} T={T}>{m}</Tag>)}
+                  </div>
+
+                  {/* Détail par exercice */}
+                  <div style={{borderTop:`1px solid ${T.border}`,paddingTop:10}}>
+                    {s.exercises.map((e,i)=>{
+                      const working=(e.sets||[]).filter(st=>!st.isWarmup&&(st.weight||st.reps));
+                      const warmupSets=(e.sets||[]).filter(st=>st.isWarmup&&(st.weight||st.reps));
+                      const withRPE=working.filter(st=>st.rpe);
+                      const avgRPE=withRPE.length?(withRPE.reduce((a,st)=>a+(parseFloat(st.rpe)||0),0)/withRPE.length).toFixed(1):null;
+                      const bestORM=Math.max(0,...working.map(st=>estimate1RM(st.weight,st.reps)));
+                      const restTimes=working.filter(st=>st.restMs&&st.restMs>5000).map(st=>formatRest(st.restMs)).filter(Boolean);
+                      const isPR=prSet.has(s.id+":"+e.name);
+                      return (
+                        <div key={i} style={{marginBottom:10,paddingBottom:10,borderBottom:i<s.exercises.length-1?`1px solid ${T.border}`:"none"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5,flexWrap:"wrap"}}>
+                            <span style={{fontWeight:600,fontSize:13,color:T.text}}>{e.name}</span>
+                            {e.muscle&&<Tag T={T}>{e.muscle}</Tag>}
+                            {isPR&&<span style={{fontSize:11,color:"#f59e0b",fontWeight:700}}>🏆 PR</span>}
+                          </div>
+                          {working.length>0&&(
+                            <div style={{fontSize:12,color:T.text,marginBottom:4,lineHeight:1.8,fontVariantNumeric:"tabular-nums"}}>
+                              {working.map((st,j)=>(
+                                <span key={j} style={{display:"inline-block",marginRight:8,whiteSpace:"nowrap",background:T.bgInput,borderRadius:6,padding:"1px 6px",border:`1px solid ${T.border}`}}>
+                                  <strong>{st.weight||"—"}</strong>×<strong>{st.reps||"—"}</strong>
+                                  {st.rpe&&<span style={{color:T.muted,fontSize:10}}> @{st.rpe}</span>}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {warmupSets.length>0&&(
+                            <div style={{fontSize:11,color:T.muted,marginBottom:4}}>
+                              Échauffement : {warmupSets.map(st=>`${st.weight||"—"}×${st.reps||"—"}`).join(" · ")}
+                            </div>
+                          )}
+                          <div style={{display:"flex",gap:10,flexWrap:"wrap",fontSize:11,color:T.muted}}>
+                            {avgRPE&&<span>RPE moy: <strong style={{color:T.text}}>{avgRPE}</strong></span>}
+                            {bestORM>0&&<span>1RM: <strong style={{color:T.accent}}>{bestORM} kg</strong></span>}
+                            {restTimes.length>0&&<span>⏱ {restTimes.join(" · ")}</span>}
+                          </div>
+                          {e.notes&&<div style={{fontSize:11,color:T.muted,marginTop:4,fontStyle:"italic"}}>💬 {e.notes}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {s.notes&&<div style={{borderTop:`1px solid ${T.border}`,paddingTop:8,fontSize:12,color:T.muted,fontStyle:"italic"}}>📝 {s.notes}</div>}
                 </div>
               );
             })}
