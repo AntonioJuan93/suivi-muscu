@@ -12,6 +12,7 @@ const EQUIPMENT = [
   {v:"alteres",l:"Altères"},
   {v:"poulie",l:"Poulie"},
   {v:"machine",l:"Machine guidée"},
+  {v:"smith",l:"Smith"},
 ];
 function equipLabel(v){ return EQUIPMENT.find(e=>e.v===v)?.l||""; }
 function exKey(name,equip){ return name+(equip?":::"+equip:""); }
