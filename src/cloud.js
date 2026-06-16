@@ -35,7 +35,7 @@ export async function fetchAllUsers() {
   if (!user) return [];
   const { data, error } = await supabase
     .from("tracker")
-    .select("data->email");
+    .select("data->>email");
   if (error || !data) return [];
   return data
     .map(r => r.email)
