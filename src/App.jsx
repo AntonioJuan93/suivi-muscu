@@ -209,26 +209,6 @@ function ExercisePicker({ onSelect, onCancel, onRename, recentVariants, allExerc
         ))}
       </div>
 
-      {sections.length>0&&(
-        <>
-          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-            <MonoLabel>Prise / Position</MonoLabel>
-            <span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-accent)",letterSpacing:".06em",padding:"2px 8px",borderRadius:20,background:"var(--sm-accent-soft)"}}>{GRIP_PROFILE_LABELS[profile]?.label}</span>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(sections.length,3)},1fr)`,gap:8,marginBottom:8}}>
-            {sections.map(sec=>(
-              <div key={sec.key}>
-                <div style={{fontSize:9,color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".08em",marginBottom:4,textTransform:"uppercase"}}>{sec.label}</div>
-                <select value={grip[sec.key]||""} onChange={e=>setGrip(g=>({...g,[sec.key]:e.target.value}))} style={{...S.inp,fontSize:11,padding:"6px 8px"}}>
-                  {sec.opts.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
-                </select>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-      <input value={gripNote} onChange={e=>setGripNote(e.target.value)} placeholder={sections.length>0?"Note complémentaire…":"Note de prise (ex: prise triangle, neutre serré…)"} style={{...S.inp,fontSize:12,marginBottom:20}}/>
-
       <button onClick={onConfirm} style={{...S.btnP,width:"100%",padding:"14px",fontSize:14}}>Ajouter à la séance</button>
     </div>
     );
@@ -908,7 +888,7 @@ export default function App() {
       const targetSets=parseInt((typeof ex==="object"&&ex.targetSets)||"3")||3;
       const last=getLastForExercise(name,equipment);
       const defaultWeight=last?.maxWeight?String(last.maxWeight):"";
-      const sets=Array.from({length:targetSets},()=>({weight:defaultWeight,reps:"",repsL:"",repsR:"",rpe:"",isWarmup:false,restMs:null,note:""}));
+      const sets=Array.from({length:targetSets},()=>({weight:defaultWeight,reps:"",repsL:"",repsR:"",rpe:"",isWarmup:false,restMs:null,note:"",repsExtra:""}));
       return{id:now+i,name,muscle,equipment,notes:"",sets,target:{sets:targetSets,reps:targetReps,type:p.type||"volume"}};
     }));
   }
@@ -929,7 +909,7 @@ export default function App() {
       if(e.id!==id)return e;
       let sets=e.sets;
       if(activeRest&&activeRest.exId===id){const elapsed=now-activeRest.startTime;sets=sets.map((st,i)=>i===activeRest.si?{...st,restMs:elapsed}:st);}
-      return{...e,sets:[...sets,{weight:"",reps:"",repsL:"",repsR:"",rpe:"",isWarmup:false,restMs:null,note:""}]};
+      return{...e,sets:[...sets,{weight:"",reps:"",repsL:"",repsR:"",rpe:"",isWarmup:false,restMs:null,note:"",repsExtra:""}]};
     }));
     if(activeRest&&activeRest.exId===id)setActiveRest(null);
   }
@@ -944,6 +924,7 @@ export default function App() {
   function updateSet(id,si,f,v){setExercises(ex=>ex.map(e=>e.id===id?{...e,sets:e.sets.map((st,i)=>i===si?{...st,[f]:v}:st)}:e));}
   function removeExercise(id){setExercises(ex=>ex.filter(e=>e.id!==id));}
   function updateExNotes(id,v){setExercises(ex=>ex.map(e=>e.id===id?{...e,notes:v}:e));}
+  function updateExGrip(id,key,val){setExercises(ex=>ex.map(e=>e.id===id?{...e,grip:{...e.grip,[key]:val}}:e));}
 
   function addExercise(picked){
     const{name,muscle,equipment="",unilateral=false,grip={},gripNote="",custom=false,muscles=[],tension="",category="",gripProfile}=picked;
@@ -1324,6 +1305,22 @@ export default function App() {
                     </div>
                   )}
 
+                  {(()=>{
+                    const exProfile=getGripProfile(ex);
+                    const exSecs=getAdaptedSections(exProfile,ex.equipment);
+                    if(!exSecs.length)return null;
+                    return(
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginBottom:8}}>
+                        <span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",letterSpacing:".08em",textTransform:"uppercase"}}>Prise</span>
+                        {exSecs.map(sec=>(
+                          <select key={sec.key} value={ex.grip?.[sec.key]||""} onChange={e=>updateExGrip(ex.id,sec.key,e.target.value)} style={{fontSize:10,color:"var(--sm-sub)",background:"var(--sm-card2)",border:"1px solid var(--sm-line)",borderRadius:20,padding:"3px 8px",cursor:"pointer",outline:"none",fontFamily:"var(--sm-font-mono)"}}>
+                            {sec.opts.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
+                          </select>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
                   <div style={{display:"grid",gridTemplateColumns:"18px 22px 1fr 1fr 24px",gap:5,alignItems:"center",marginBottom:4}}>
                     {["#","W","kg",ex.unilateral?"G · D":"Reps",""].map((h,i)=><span key={i} style={{fontSize:9,color:ex.unilateral&&i===3?"var(--sm-up)":"var(--sm-sub)",textAlign:"center",fontFamily:"var(--sm-font-mono)",letterSpacing:".08em",textTransform:"uppercase"}}>{h}</span>)}
                   </div>
@@ -1367,9 +1364,10 @@ export default function App() {
                                 const col=dir==="up"?"var(--sm-up)":dir==="down"?"#e05555":"var(--sm-sub)";
                                 const icon=dir==="up"?"↑":dir==="down"?"↓":"→";
                                 const repsDisplay=ex.unilateral&&(lastSet.repsL||lastSet.repsR)?`${lastSet.repsL||"—"}/${lastSet.repsR||"—"}`:`${lastR}`;
+                                const extraDisp=lastSet.repsExtra?.trim()?` +${lastSet.repsExtra.trim()}p`:"";
                                 return(
                                   <span style={{fontFamily:"var(--sm-font-mono)",fontSize:10,color:col,letterSpacing:".04em"}}>
-                                    {icon} {lastW}kg × {repsDisplay}
+                                    {icon} {lastW}kg × {repsDisplay}{extraDisp}
                                   </span>
                                 );
                               })()}
@@ -1381,12 +1379,21 @@ export default function App() {
                               <button onClick={()=>updateSet(ex.id,si,"note",s.note===undefined?"":s.note===""?" ":"")} style={{fontSize:9,background:"none",border:"1px solid var(--sm-line)",borderRadius:8,padding:"2px 8px",cursor:"pointer",color:s.note?.trim()?"var(--sm-accent)":"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".06em"}}>
                                 {s.note?.trim()?"note ✓":"+ note"}
                               </button>
+                              <button onClick={()=>updateSet(ex.id,si,"repsExtra",s.repsExtra?.trim()?"":s.repsExtra===""?" ":"")} style={{fontSize:9,background:"none",border:"1px solid var(--sm-line)",borderRadius:8,padding:"2px 8px",cursor:"pointer",color:s.repsExtra?.trim()?"var(--sm-up)":"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".06em"}}>
+                                {s.repsExtra?.trim()?`+${s.repsExtra.trim()}p`:"+ partiel"}
+                              </button>
                             </div>
                           )}
 
                           {!s.isWarmup&&(s.note?.trim()||s.note===" ")&&(
                             <div style={{paddingLeft:24,marginTop:4}}>
                               <input value={s.note?.trim()?s.note:""} onChange={e=>updateSet(ex.id,si,"note",e.target.value)} placeholder="Note sur cette série…" style={{...S.inp,fontSize:11,padding:"6px 10px",width:"100%"}}/>
+                            </div>
+                          )}
+
+                          {!s.isWarmup&&(s.repsExtra?.trim()||s.repsExtra===" ")&&(
+                            <div style={{paddingLeft:24,marginTop:4}}>
+                              <input type="number" value={s.repsExtra?.trim()?s.repsExtra:""} onChange={e=>updateSet(ex.id,si,"repsExtra",e.target.value)} placeholder="Reps partielles…" style={{...S.inp,fontSize:11,padding:"6px 10px",width:"100%"}}/>
                             </div>
                           )}
 
