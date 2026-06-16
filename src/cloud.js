@@ -30,6 +30,18 @@ export async function searchUserByEmail(email) {
   return data.data;
 }
 
+export async function fetchAllUsers() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data, error } = await supabase
+    .from("tracker")
+    .select("data->email");
+  if (error || !data) return [];
+  return data
+    .map(r => r.email)
+    .filter(e => e && e !== user.email);
+}
+
 export async function saveCloud(appData) {
   if (rowId) {
     await supabase

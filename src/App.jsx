@@ -3,7 +3,7 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContai
 import { MUSCLE_GROUPS, INITIAL_PROGRAMS, T, makeStyles, formatDate, calcVolume, estimate1RM, startOfWeek } from "./theme";
 import { loadData, saveData } from "./storage";
 import { supabase } from "./supabase";
-import { loadCloud, saveCloud, clearCloudCache, searchUserByEmail } from "./cloud";
+import { loadCloud, saveCloud, clearCloudCache, searchUserByEmail, fetchAllUsers } from "./cloud";
 import Auth from "./Auth";
 
 const EQUIPMENT = [
@@ -294,6 +294,7 @@ export default function App() {
   const [partnerData, setPartnerData] = useState(null);
   const [partnerLoading, setPartnerLoading] = useState(false);
   const [partnerError, setPartnerError] = useState("");
+  const [partnerUsers, setPartnerUsers] = useState([]);
 
   const S = useMemo(()=>makeStyles(),[]);
   const saveTimer = useRef(null);
@@ -417,9 +418,9 @@ export default function App() {
   useEffect(()=>{
     const{data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{
       const u=session?.user??null;setUser(u);
-      if(event==="INITIAL_SESSION"){setAuthReady(true);if(u)loadCloud().then(d=>{if(d)applyData(d,false);setCloudLoaded(true);});}
-      if(event==="SIGNED_IN")loadCloud().then(d=>{if(d)applyData(d,false);setCloudLoaded(true);});
-      if(event==="SIGNED_OUT"){clearCloudCache();setCloudLoaded(false);setSessions([]);setPrograms(INITIAL_PROGRAMS);setDarkMode(false);resetDraft();setMode("free");saveData(null);}
+      if(event==="INITIAL_SESSION"){setAuthReady(true);if(u){loadCloud().then(d=>{if(d)applyData(d,false);setCloudLoaded(true);});fetchAllUsers().then(setPartnerUsers);}}
+      if(event==="SIGNED_IN"){loadCloud().then(d=>{if(d)applyData(d,false);setCloudLoaded(true);});fetchAllUsers().then(setPartnerUsers);}
+      if(event==="SIGNED_OUT"){clearCloudCache();setCloudLoaded(false);setSessions([]);setPrograms(INITIAL_PROGRAMS);setDarkMode(false);resetDraft();setMode("free");saveData(null);setPartnerUsers([]);}
     });
     return()=>subscription.unsubscribe();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -757,18 +758,24 @@ export default function App() {
 
             <button onClick={()=>setTab("log")} style={{...S.btnP,width:"100%",padding:15,fontSize:15,letterSpacing:".03em"}}>+ Nouvelle séance libre</button>
 
-            <div style={{...S.card,marginTop:14}}>
-              <MonoLabel>Voir la progression d'un·e partenaire</MonoLabel>
-              <div style={{display:"flex",gap:8,marginTop:8}}>
-                <input type="email" placeholder="Email du partenaire" value={partnerEmail} onChange={e=>{setPartnerEmail(e.target.value);setPartnerError("");}}
-                  onKeyDown={e=>e.key==="Enter"&&searchPartner()}
-                  style={{...S.inp,flex:1}}/>
-                <button onClick={searchPartner} disabled={partnerLoading} style={{...S.btnP,flexShrink:0,padding:"10px 18px",opacity:partnerLoading?.6:1}}>
-                  {partnerLoading?"...":"Voir"}
-                </button>
+            {partnerUsers.length>0&&(
+              <div style={{...S.card,marginTop:14}}>
+                <MonoLabel>Voir la progression d'un·e partenaire</MonoLabel>
+                <div style={{display:"flex",gap:8,marginTop:8}}>
+                  <select value={partnerEmail} onChange={e=>{setPartnerEmail(e.target.value);setPartnerError("");}}
+                    style={{...S.inp,flex:1,cursor:"pointer"}}>
+                    <option value="">Sélectionner un compte…</option>
+                    {partnerUsers.map(em=>(
+                      <option key={em} value={em}>{em}</option>
+                    ))}
+                  </select>
+                  <button onClick={searchPartner} disabled={partnerLoading||!partnerEmail} style={{...S.btnP,flexShrink:0,padding:"10px 18px",opacity:(partnerLoading||!partnerEmail)?0.5:1}}>
+                    {partnerLoading?"...":"Voir"}
+                  </button>
+                </div>
+                {partnerError&&<div style={{marginTop:6,fontSize:12,color:"#e05555",fontFamily:"var(--sm-font-mono)"}}>{partnerError}</div>}
               </div>
-              {partnerError&&<div style={{marginTop:6,fontSize:12,color:"#e05555",fontFamily:"var(--sm-font-mono)"}}>{partnerError}</div>}
-            </div>
+            )}
           </div>
         )}
 
