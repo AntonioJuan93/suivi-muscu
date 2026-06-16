@@ -48,14 +48,19 @@ function MonoLabel({ children }) {
 }
 
 function PartnerProfile({ data, email, S }) {
+  const [activeProg, setActiveProg] = useState("Tous");
   const sessions = data?.sessions || [];
   const weekStart = startOfWeek(new Date());
   const wVol = sets => calcVolume((sets||[]).filter(s=>!s.isWarmup));
 
+  // ── Programmes disponibles ────────────────────────────────────────────────────
+  const programs = ["Tous", ...[...new Set(sessions.map(s=>s.programName).filter(Boolean))]];
+  const filtered = activeProg==="Tous" ? sessions : sessions.filter(s=>s.programName===activeProg);
+
   // ── Assiduité ────────────────────────────────────────────────────────────────
   const thisWeek = sessions.filter(s=>new Date(s.date)>=weekStart).length;
   const thisWeekVol = Math.round(sessions.filter(s=>new Date(s.date)>=weekStart).reduce((a,s)=>a+s.exercises.reduce((b,e)=>b+wVol(e.sets),0),0));
-  const lastSession = sessions[0] || null;
+  const lastSession = filtered[0] || null;
 
   // Séances sur 4 semaines vs 4 semaines précédentes
   const fourWeeksAgo = new Date(weekStart); fourWeeksAgo.setDate(fourWeeksAgo.getDate()-28);
@@ -64,9 +69,9 @@ function PartnerProfile({ data, email, S }) {
   const prevCount   = sessions.filter(s=>{ const d=new Date(s.date); return d>=eightWeeksAgo&&d<fourWeeksAgo; }).length;
   const attendanceTrend = recentCount>prevCount?"up":recentCount<prevCount?"down":"stable";
 
-  // ── Progression par exercice (top 5 les plus pratiqués) ─────────────────────
+  // ── Progression par exercice (top 5 les plus pratiqués dans le programme sélectionné) ──
   const exFreq = {};
-  sessions.forEach(s=>s.exercises.forEach(e=>{
+  filtered.forEach(s=>s.exercises.forEach(e=>{
     const k=exKey(e.name,e.equipment||"");
     exFreq[k]=(exFreq[k]||0)+1;
   }));
@@ -74,18 +79,16 @@ function PartnerProfile({ data, email, S }) {
 
   const exProgression = topExKeys.map(k=>{
     const [name,equip=""]=k.split(":::");
-    // dernières 4 séances contenant cet exercice
-    const history = sessions
+    const history = filtered
       .filter(s=>s.exercises.some(e=>e.name===name&&(e.equipment||"")===(equip)))
       .slice(0,4)
       .reverse()
       .map(s=>{
         const e=s.exercises.find(x=>x.name===name&&(x.equipment||"")===(equip));
         const working=(e.sets||[]).filter(st=>!st.isWarmup&&(st.weight||st.reps));
-        const bestVol = working.reduce((mx,st)=>{const v=(parseFloat(st.weight)||0)*(parseInt(st.reps)||0);return v>mx?v:mx;},0);
         const bestW = Math.max(0,...working.map(st=>parseFloat(st.weight)||0));
         const totalVol = Math.round(working.reduce((a,st)=>a+(parseFloat(st.weight)||0)*(parseInt(st.reps)||0),0));
-        return { date:s.date, bestWeight:bestW, bestSetVol:bestVol, totalVol, sets:working.length };
+        return { date:s.date, bestWeight:bestW, totalVol, sets:working.length };
       });
     if(history.length<2) return null;
     const last=history[history.length-1], prev=history[history.length-2];
@@ -93,20 +96,20 @@ function PartnerProfile({ data, email, S }) {
     return { name, equip, history, trend };
   }).filter(Boolean);
 
-  // ── Équilibre musculaire (4 dernières semaines) ──────────────────────────────
+  // ── Équilibre musculaire (4 dernières semaines, programme sélectionné) ────────
   const muscleFreq = {};
-  sessions.filter(s=>new Date(s.date)>=fourWeeksAgo).forEach(s=>
+  filtered.filter(s=>new Date(s.date)>=fourWeeksAgo).forEach(s=>
     s.exercises.forEach(e=>{ if(e.muscle){ muscleFreq[e.muscle]=(muscleFreq[e.muscle]||0)+1; } })
   );
   const muscleData = Object.entries(muscleFreq).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([m,n])=>({m,n}));
   const maxMuscle = muscleData[0]?.n||1;
 
-  // ── Volume hebdo ─────────────────────────────────────────────────────────────
+  // ── Volume hebdo (programme sélectionné) ─────────────────────────────────────
   const weeklyTrend = Array.from({length:6},(_,i)=>{
     const ws=new Date(weekStart);ws.setDate(ws.getDate()-(5-i)*7);
     const we=new Date(ws);we.setDate(we.getDate()+7);
-    const filtered=sessions.filter(s=>{const d=new Date(s.date);return d>=ws&&d<we;});
-    return{label:ws.toLocaleDateString("fr-FR",{day:"2-digit",month:"short"}),vol:Math.round(filtered.reduce((a,s)=>a+s.exercises.reduce((b,e)=>b+wVol(e.sets),0),0)),count:filtered.length};
+    const wFiltered=filtered.filter(s=>{const d=new Date(s.date);return d>=ws&&d<we;});
+    return{label:ws.toLocaleDateString("fr-FR",{day:"2-digit",month:"short"}),vol:Math.round(wFiltered.reduce((a,s)=>a+s.exercises.reduce((b,e)=>b+wVol(e.sets),0),0)),count:wFiltered.length};
   });
 
   const displayName = email.split("@")[0];
@@ -115,6 +118,20 @@ function PartnerProfile({ data, email, S }) {
 
   return (
     <div>
+      {/* ── Sélecteur de programme ── */}
+      {programs.length>2&&(
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
+          {programs.map(p=>{
+            const active=p===activeProg;
+            return(
+              <button key={p} onClick={()=>setActiveProg(p)} style={{fontFamily:"var(--sm-font-mono)",fontSize:11,letterSpacing:".06em",padding:"7px 16px",borderRadius:"var(--sm-r-pill)",border:`1px solid ${active?"var(--sm-accent)":"var(--sm-line)"}`,background:active?"var(--sm-accent-soft)":"transparent",color:active?"var(--sm-accent)":"var(--sm-sub)",cursor:"pointer",whiteSpace:"nowrap",transition:"all .15s"}}>
+                {p}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* ── Header assiduité ── */}
       <div style={{...S.card,display:"flex",alignItems:"center",gap:20,marginBottom:14}}>
         <div style={{position:"relative",flexShrink:0,width:108,height:108}}>
