@@ -16,8 +16,51 @@ const EQUIPMENT = [
   {v:"smith",l:"Smith"},
 ];
 function equipLabel(v){ return EQUIPMENT.find(e=>e.v===v)?.l||""; }
-function gripKey(g){ if(!g)return""; return[g.orientation,g.width,g.barType].filter(Boolean).join("-"); }
+function gripKey(g){ if(!g)return""; return[g.orientation,g.barPos,g.width,g.barType,g.handle].filter(Boolean).join("-"); }
 function exKey(name,equip,grip){ return name+(equip?":::"+equip:"")+(gripKey(grip)?":::"+gripKey(grip):""); }
+
+const GRIP_CONFIGS = {
+  push:  { sections:[
+    {key:"orientation",label:"Orientation",opts:[{v:"",l:"—"},{v:"pronation",l:"Pronation"},{v:"supination",l:"Supination"},{v:"neutre",l:"Neutre"}]},
+    {key:"width",label:"Largeur",opts:[{v:"",l:"—"},{v:"etroit",l:"Étroite"},{v:"normal",l:"Normale"},{v:"large",l:"Large"}]},
+    {key:"barType",label:"Barre",opts:[{v:"",l:"—"},{v:"droite",l:"Droite"},{v:"ez",l:"EZ"},{v:"trap",l:"Trap bar"}]},
+  ]},
+  pull:  { sections:[
+    {key:"orientation",label:"Orientation",opts:[{v:"",l:"—"},{v:"pronation",l:"Surpaume"},{v:"supination",l:"Sous-main"},{v:"neutre",l:"Neutre (hammer)"}]},
+    {key:"width",label:"Largeur",opts:[{v:"",l:"—"},{v:"etroit",l:"Étroite"},{v:"normal",l:"Normale"},{v:"large",l:"Large"}]},
+    {key:"handle",label:"Poignée",opts:[{v:"",l:"—"},{v:"barre",l:"Barre"},{v:"corde",l:"Corde"},{v:"triangle",l:"Triangle"},{v:"anses",l:"Anses"}]},
+  ]},
+  squat: { sections:[
+    {key:"barPos",label:"Position barre",opts:[{v:"",l:"—"},{v:"haute",l:"Haute (trap. sup.)"},{v:"basse",l:"Basse (trap. rétro.)"},{v:"avant",l:"Avant (front squat)"},{v:"zercher",l:"Zercher"}]},
+    {key:"width",label:"Écartement pieds",opts:[{v:"",l:"—"},{v:"etroit",l:"Étroit"},{v:"normal",l:"Normal"},{v:"large",l:"Large"},{v:"sumo",l:"Sumo"}]},
+  ]},
+  hinge: { sections:[
+    {key:"orientation",label:"Prise barre",opts:[{v:"",l:"—"},{v:"surrpaume",l:"Surrpaume"},{v:"mixte",l:"Mixte"},{v:"crochet",l:"Crochet (hook)"}]},
+    {key:"width",label:"Position pieds",opts:[{v:"",l:"—"},{v:"normal",l:"Normal"},{v:"large",l:"Large"},{v:"sumo",l:"Sumo"}]},
+  ]},
+  curl:  { sections:[
+    {key:"orientation",label:"Rotation",opts:[{v:"",l:"—"},{v:"supination",l:"Supination (bicep)"},{v:"neutre",l:"Neutre (marteau)"},{v:"pronation",l:"Pronation (reverse)"}]},
+  ]},
+  tri:   { sections:[
+    {key:"handle",label:"Poignée",opts:[{v:"",l:"—"},{v:"corde",l:"Corde"},{v:"droite",l:"Barre droite"},{v:"ez",l:"Barre EZ"},{v:"anse",l:"Anse seule"}]},
+  ]},
+  legs:  { sections:[
+    {key:"width",label:"Écartement",opts:[{v:"",l:"—"},{v:"etroit",l:"Étroit"},{v:"normal",l:"Normal"},{v:"large",l:"Large"},{v:"sumo",l:"Sumo"}]},
+  ]},
+  none:  { sections:[] },
+};
+
+function getGripProfile(ex){
+  if(!ex)return"push";
+  const n=(ex.name||"").toLowerCase();
+  if(n.includes("squat")||n.includes("hack squat")||n.includes("gobelet"))return"squat";
+  if(n.includes("soulevé")||n.includes("deadlift")||n.includes("sl deadlift")||n.includes("roumain")||n.includes("good morning")||n.includes("hyperextension")||n.includes("nordic"))return"hinge";
+  if(n.includes("curl")||n.includes("zottman"))return"curl";
+  if(n.includes("dips triceps")||n.includes("extension triceps")||n.includes("barre au front")||n.includes("kickback triceps")||(n.includes("triceps")&&!n.includes("dips")))return"tri";
+  if(n.includes("fentes")||n.includes("presse à cuisses")||n.includes("leg extension")||n.includes("leg curl")||n.includes("abduction")||n.includes("kickback fessier")||n.includes("hip abduction")||n.includes("hip thrust")||n.includes("mollets")||n.includes("crunch")||n.includes("relevé")||n.includes("planche")||n.includes("russian")||n.includes("ab wheel"))return"legs";
+  if(n.includes("tractions")||n.includes("tirage")||n.includes("rowing")||n.includes("pull-over")||n.includes("kelso")||n.includes("face pull")||n.includes("oiseau")||n.includes("élévation")||n.includes("rowing menton"))return"pull";
+  return"push";
+}
 
 // ── Design primitives ─────────────────────────────────────────────────────────
 function Tag({ children }) {
@@ -49,9 +92,6 @@ function MonoLabel({ children }) {
   return <div style={{fontFamily:"var(--sm-font-mono)", fontSize:10, letterSpacing:".14em", color:"var(--sm-sub)", textTransform:"uppercase", marginBottom:4}}>{children}</div>;
 }
 
-const GRIP_ORIENTATIONS = [{v:"",l:"—"},{v:"pronation",l:"Pronation"},{v:"supination",l:"Supination"},{v:"neutre",l:"Neutre"}];
-const GRIP_WIDTHS      = [{v:"",l:"—"},{v:"etroit",l:"Étroit"},{v:"normal",l:"Normal"},{v:"large",l:"Large"}];
-const GRIP_BARS        = [{v:"",l:"—"},{v:"droite",l:"Barre droite"},{v:"ez",l:"Barre EZ"},{v:"trap",l:"Trap bar"}];
 
 function ExercisePicker({ onSelect, onCancel, onRename, recentVariants, allExercises, S }) {
   const [step, setStep]               = useState("list"); // "list" | "configure" | "custom"
@@ -60,7 +100,7 @@ function ExercisePicker({ onSelect, onCancel, onRename, recentVariants, allExerc
   const [picked, setPicked]           = useState(null);
   const [equipment, setEquipment]     = useState("");
   const [unilateral, setUnilateral]   = useState(false);
-  const [grip, setGrip]               = useState({orientation:"",width:"",barType:""});
+  const [grip, setGrip]               = useState({});
   const [gripNote, setGripNote]       = useState("");
   const [renamingName, setRenamingName] = useState(null);
   const [renameVal, setRenameVal]     = useState("");
@@ -80,7 +120,7 @@ function ExercisePicker({ onSelect, onCancel, onRename, recentVariants, allExerc
   function pickExercise(ex){
     setPicked(ex);
     setEquipment("");setUnilateral(false);
-    setGrip({orientation:"",width:"",barType:""});setGripNote("");
+    setGrip({});setGripNote("");
     setStep("configure");
   }
 
@@ -98,10 +138,17 @@ function ExercisePicker({ onSelect, onCancel, onRename, recentVariants, allExerc
   const tensionLabel = t => t==="etirement"?"Étirement":t==="contraction"?"Contraction":"Neutre";
   const tensionColor = t => t==="etirement"?"var(--sm-up)":t==="contraction"?"var(--sm-accent)":"var(--sm-sub)";
 
-  const ConfigStep = ({onConfirm})=>(
+  const ConfigStep = ({onConfirm, customMode=false})=>{
+    const exForProfile = customMode ? {name:customName,muscle:customMuscle} : picked;
+    const profile = getGripProfile(exForProfile);
+    const gripConfig = GRIP_CONFIGS[profile] || GRIP_CONFIGS.push;
+    const displayName = customMode ? (customName||"Exercice perso") : (picked?.name||"");
+    const displayMuscle = customMode ? customMuscle : (picked?.muscle||"");
+    const displayMuscles = customMode ? [] : (picked?.muscles||[]);
+    return(
     <div style={{padding:"16px 20px 32px",overflowY:"auto",flex:1}}>
-      <div style={{fontFamily:"var(--sm-font-disp)",fontSize:22,color:"var(--sm-ink)",marginBottom:4}}>{picked?.name||customName}</div>
-      {picked?.muscle&&<div style={{fontFamily:"var(--sm-font-mono)",fontSize:11,color:"var(--sm-sub)",marginBottom:16}}>{picked.muscle}{picked.muscles?.length>0?` · ${picked.muscles.slice(0,2).join(", ")}`:""}</div>}
+      <div style={{fontFamily:"var(--sm-font-disp)",fontSize:22,color:"var(--sm-ink)",marginBottom:4}}>{displayName}</div>
+      {displayMuscle&&<div style={{fontFamily:"var(--sm-font-mono)",fontSize:11,color:"var(--sm-sub)",marginBottom:16}}>{displayMuscle}{displayMuscles.length>0?` · ${displayMuscles.slice(0,2).join(", ")}`:""}</div>}
 
       <MonoLabel>Équipement</MonoLabel>
       <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:16}}>
@@ -114,29 +161,34 @@ function ExercisePicker({ onSelect, onCancel, onRename, recentVariants, allExerc
 
       <MonoLabel>Unilatéral</MonoLabel>
       <div style={{display:"flex",gap:8,marginBottom:16}}>
-        {[[false,"Non"],[true,"Oui — / côté"]].map(([v,l])=>(
-          <button key={String(v)} onClick={()=>setUnilateral(v)} style={{flex:1,padding:"8px",borderRadius:14,border:`1px solid ${unilateral===v?"var(--sm-up)":"var(--sm-line)"}`,background:unilateral===v?"rgba(47,158,109,.12)":"transparent",color:unilateral===v?"var(--sm-up)":"var(--sm-sub)",cursor:"pointer",fontSize:12,fontFamily:"var(--sm-font-mono)"}}>
+        {[[false,"Non — les 2 côtés ensemble"],[true,"Oui — 1 côté à la fois"]].map(([v,l])=>(
+          <button key={String(v)} onClick={()=>setUnilateral(v)} style={{flex:1,padding:"8px",borderRadius:14,border:`1px solid ${unilateral===v?"var(--sm-up)":"var(--sm-line)"}`,background:unilateral===v?"rgba(47,158,109,.12)":"transparent",color:unilateral===v?"var(--sm-up)":"var(--sm-sub)",cursor:"pointer",fontSize:11,fontFamily:"var(--sm-font-mono)"}}>
             {l}
           </button>
         ))}
       </div>
 
-      <MonoLabel>Prise</MonoLabel>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:8}}>
-        {[["Orientation",GRIP_ORIENTATIONS,"orientation"],["Largeur",GRIP_WIDTHS,"width"],["Barre",GRIP_BARS,"barType"]].map(([label,opts,field])=>(
-          <div key={field}>
-            <div style={{fontSize:9,color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".08em",marginBottom:4,textTransform:"uppercase"}}>{label}</div>
-            <select value={grip[field]} onChange={e=>setGrip(g=>({...g,[field]:e.target.value}))} style={{...S.inp,fontSize:11,padding:"6px 8px"}}>
-              {opts.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
-            </select>
+      {gripConfig.sections.length>0&&(
+        <>
+          <MonoLabel>Prise / Position</MonoLabel>
+          <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(gripConfig.sections.length,3)},1fr)`,gap:8,marginBottom:8}}>
+            {gripConfig.sections.map(sec=>(
+              <div key={sec.key}>
+                <div style={{fontSize:9,color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".08em",marginBottom:4,textTransform:"uppercase"}}>{sec.label}</div>
+                <select value={grip[sec.key]||""} onChange={e=>setGrip(g=>({...g,[sec.key]:e.target.value}))} style={{...S.inp,fontSize:11,padding:"6px 8px"}}>
+                  {sec.opts.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
+                </select>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <input value={gripNote} onChange={e=>setGripNote(e.target.value)} placeholder="Note de prise libre (ex: prise triangle, neutre serré…)" style={{...S.inp,fontSize:12,marginBottom:20}}/>
+        </>
+      )}
+      <input value={gripNote} onChange={e=>setGripNote(e.target.value)} placeholder={gripConfig.sections.length>0?"Note complémentaire…":"Note de prise (ex: prise triangle, neutre serré…)"} style={{...S.inp,fontSize:12,marginBottom:20}}/>
 
       <button onClick={onConfirm} style={{...S.btnP,width:"100%",padding:"14px",fontSize:14}}>Ajouter à la séance</button>
     </div>
-  );
+    );
+  };
 
   if(step==="configure") return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
@@ -180,7 +232,7 @@ function ExercisePicker({ onSelect, onCancel, onRename, recentVariants, allExerc
               </button>
             ))}
           </div>
-          <ConfigStep onConfirm={confirmCustom}/>
+          <ConfigStep onConfirm={confirmCustom} customMode={true}/>
         </div>
       </div>
     </div>
@@ -206,6 +258,11 @@ function ExercisePicker({ onSelect, onCancel, onRename, recentVariants, allExerc
         </div>
 
         <div style={{overflowY:"auto",flex:1,padding:"8px 0"}}>
+          <div style={{padding:"8px 20px 10px"}}>
+            <button onClick={()=>{setPicked(null);setEquipment("");setUnilateral(false);setGrip({});setGripNote("");setStep("custom");}} style={{...S.btnS,width:"100%",padding:"10px",fontSize:13,borderStyle:"dashed",borderRadius:16,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+              <span style={{fontSize:16,lineHeight:1}}>+</span> Exercice personnalisé
+            </button>
+          </div>
           {!search&&!muscleFilter&&recentVariants?.length>0&&(
             <div style={{padding:"6px 20px 10px"}}>
               <div style={{fontFamily:"var(--sm-font-mono)",fontSize:10,letterSpacing:".1em",color:"var(--sm-sub)",textTransform:"uppercase",marginBottom:8}}>Récents</div>
@@ -256,11 +313,7 @@ function ExercisePicker({ onSelect, onCancel, onRename, recentVariants, allExerc
             <div style={{padding:"20px",textAlign:"center",color:"var(--sm-sub)",fontFamily:"var(--sm-font-serif)",fontStyle:"italic",fontSize:14}}>Aucun résultat.</div>
           )}
 
-          <div style={{padding:"12px 20px 24px"}}>
-            <button onClick={()=>{setPicked(null);setEquipment("");setUnilateral(false);setGrip({orientation:"",width:"",barType:""});setGripNote("");setStep("custom");}} style={{...S.btnS,width:"100%",padding:"10px",fontSize:13}}>
-              + Exercice personnalisé
-            </button>
-          </div>
+          <div style={{height:16}}/>
         </div>
       </div>
     </div>
@@ -649,7 +702,13 @@ export default function App() {
   useEffect(()=>{ document.documentElement.dataset.theme = darkMode?"dark":""; },[darkMode]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-  function wVolume(sets){ return calcVolume((sets||[]).filter(s=>!s.isWarmup)); }
+  function wVolume(sets){
+    return (sets||[]).filter(s=>!s.isWarmup).reduce((acc,s)=>{
+      const w=parseFloat(s.weight)||0;
+      const r=Math.max(parseInt(s.repsL)||0,parseInt(s.repsR)||0)||(parseInt(s.reps)||0);
+      return acc+w*r;
+    },0);
+  }
 
   function formatRest(ms){
     if(!ms||ms<5000)return null;
@@ -804,7 +863,7 @@ export default function App() {
       const targetSets=parseInt((typeof ex==="object"&&ex.targetSets)||"3")||3;
       const last=getLastForExercise(name,equipment);
       const defaultWeight=last?.maxWeight?String(last.maxWeight):"";
-      const sets=Array.from({length:targetSets},()=>({weight:defaultWeight,reps:"",rpe:"",isWarmup:false,restMs:null,note:""}));
+      const sets=Array.from({length:targetSets},()=>({weight:defaultWeight,reps:"",repsL:"",repsR:"",rpe:"",isWarmup:false,restMs:null,note:""}));
       return{id:now+i,name,muscle,equipment,notes:"",sets,target:{sets:targetSets,reps:targetReps,type:p.type||"volume"}};
     }));
   }
@@ -815,7 +874,7 @@ export default function App() {
     setSessionDuration(s.duration?String(s.duration):"");setSessionNotes("");
     setSessionBodyweight("");setSessionRating(null);setSessionSleep(null);setSessionEnergy(null);
     const now=Date.now();
-    setExercises(s.exercises.map((e,i)=>({id:now+i,name:e.name,muscle:e.muscle,equipment:e.equipment||"",notes:"",sets:(e.sets||[]).map(st=>({weight:st.weight,reps:st.reps,rpe:"",isWarmup:st.isWarmup||false,restMs:null,note:""}))})));
+    setExercises(s.exercises.map((e,i)=>({id:now+i,name:e.name,muscle:e.muscle,equipment:e.equipment||"",unilateral:e.unilateral||false,grip:e.grip||{},gripNote:e.gripNote||"",notes:"",sets:(e.sets||[]).map(st=>({weight:st.weight,reps:st.reps,repsL:st.repsL||"",repsR:st.repsR||"",rpe:"",isWarmup:st.isWarmup||false,restMs:null,note:""}))})));
     setTab("log");
   }
 
@@ -825,7 +884,7 @@ export default function App() {
       if(e.id!==id)return e;
       let sets=e.sets;
       if(activeRest&&activeRest.exId===id){const elapsed=now-activeRest.startTime;sets=sets.map((st,i)=>i===activeRest.si?{...st,restMs:elapsed}:st);}
-      return{...e,sets:[...sets,{weight:"",reps:"",rpe:"",isWarmup:false,restMs:null,note:""}]};
+      return{...e,sets:[...sets,{weight:"",reps:"",repsL:"",repsR:"",rpe:"",isWarmup:false,restMs:null,note:""}]};
     }));
     if(activeRest&&activeRest.exId===id)setActiveRest(null);
   }
@@ -1210,7 +1269,7 @@ export default function App() {
 
                   {(ex.grip&&gripKey(ex.grip)||ex.gripNote)&&(
                     <div style={{fontSize:10,color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".04em",marginBottom:6,display:"flex",gap:8,flexWrap:"wrap"}}>
-                      {gripKey(ex.grip)&&<span style={{background:"var(--sm-card2)",borderRadius:20,padding:"2px 8px",border:"1px solid var(--sm-line)"}}>{[ex.grip.orientation,ex.grip.width,ex.grip.barType].filter(Boolean).join(" · ")}</span>}
+                      {gripKey(ex.grip)&&<span style={{background:"var(--sm-card2)",borderRadius:20,padding:"2px 8px",border:"1px solid var(--sm-line)"}}>{[ex.grip.orientation,ex.grip.barPos,ex.grip.width,ex.grip.barType,ex.grip.handle].filter(Boolean).join(" · ")}</span>}
                       {ex.gripNote&&<span style={{fontStyle:"italic",color:"var(--sm-sub)"}}>{ex.gripNote}</span>}
                     </div>
                   )}
@@ -1221,7 +1280,7 @@ export default function App() {
                   )}
 
                   <div style={{display:"grid",gridTemplateColumns:"18px 22px 1fr 1fr 24px",gap:5,alignItems:"center",marginBottom:4}}>
-                    {["#","W","kg",ex.unilateral?"Reps/côté":"Reps",""].map((h,i)=><span key={i} style={{fontSize:9,color:ex.unilateral&&i===3?"var(--sm-up)":"var(--sm-sub)",textAlign:"center",fontFamily:"var(--sm-font-mono)",letterSpacing:".08em",textTransform:"uppercase"}}>{h}</span>)}
+                    {["#","W","kg",ex.unilateral?"G · D":"Reps",""].map((h,i)=><span key={i} style={{fontSize:9,color:ex.unilateral&&i===3?"var(--sm-up)":"var(--sm-sub)",textAlign:"center",fontFamily:"var(--sm-font-mono)",letterSpacing:".08em",textTransform:"uppercase"}}>{h}</span>)}
                   </div>
 
                   {(()=>{
@@ -1233,8 +1292,10 @@ export default function App() {
                       const isLast=si===ex.sets.length-1;
                       const isTimerActive=activeRest?.exId===ex.id&&activeRest?.si===si;
                       const liveRestStr=isTimerActive?formatRest(liveNow-activeRest.startTime)||"0s":null;
-                      const curW=parseFloat(s.weight)||0, curR=parseInt(s.reps)||0;
-                      const lastW=parseFloat(lastSet?.weight)||0, lastR=parseInt(lastSet?.reps)||0;
+                      const curW=parseFloat(s.weight)||0;
+                      const curR=ex.unilateral?Math.max(parseInt(s.repsL)||0,parseInt(s.repsR)||0):(parseInt(s.reps)||0);
+                      const lastW=parseFloat(lastSet?.weight)||0;
+                      const lastR=ex.unilateral?Math.max(parseInt(lastSet?.repsL)||0,parseInt(lastSet?.repsR)||0):(parseInt(lastSet?.reps)||0);
                       const wentUp=curW>0&&lastW>0&&curW>lastW;
                       const wentDown=curW>0&&lastW>0&&curW<lastW;
                       return(
@@ -1243,7 +1304,14 @@ export default function App() {
                             <span style={{fontSize:11,color:"var(--sm-sub)",textAlign:"center",fontFamily:"var(--sm-font-mono)"}}>{si+1}</span>
                             <button onClick={()=>updateSet(ex.id,si,"isWarmup",!s.isWarmup)} style={{fontSize:9,fontWeight:700,border:`1px solid ${s.isWarmup?"var(--sm-accent)":"var(--sm-line)"}`,borderRadius:6,padding:"2px 0",cursor:"pointer",background:s.isWarmup?"var(--sm-accent-soft)":"transparent",color:s.isWarmup?"var(--sm-accent)":"var(--sm-sub)",lineHeight:1,width:"100%",fontFamily:"var(--sm-font-mono)"}}>W</button>
                             <input type="number" placeholder="0" value={s.weight} onChange={e=>updateSet(ex.id,si,"weight",e.target.value)} style={{...S.inp,textAlign:"center",padding:"8px 4px",fontFamily:"var(--sm-font-mono)",borderColor:wentUp?"var(--sm-up)":wentDown?"#e05555":"var(--sm-line)"}}/>
-                            <input type="number" placeholder="0" value={s.reps} onChange={e=>updateSet(ex.id,si,"reps",e.target.value)} style={{...S.inp,textAlign:"center",padding:"8px 4px",fontFamily:"var(--sm-font-mono)"}}/>
+                            {ex.unilateral?(
+                              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:3}}>
+                                <input type="number" placeholder="G" value={s.repsL||""} onChange={e=>updateSet(ex.id,si,"repsL",e.target.value)} style={{...S.inp,textAlign:"center",padding:"8px 2px",fontFamily:"var(--sm-font-mono)",fontSize:12}}/>
+                                <input type="number" placeholder="D" value={s.repsR||""} onChange={e=>updateSet(ex.id,si,"repsR",e.target.value)} style={{...S.inp,textAlign:"center",padding:"8px 2px",fontFamily:"var(--sm-font-mono)",fontSize:12}}/>
+                              </div>
+                            ):(
+                              <input type="number" placeholder="0" value={s.reps} onChange={e=>updateSet(ex.id,si,"reps",e.target.value)} style={{...S.inp,textAlign:"center",padding:"8px 4px",fontFamily:"var(--sm-font-mono)"}}/>
+                            )}
                             <button onClick={()=>removeSet(ex.id,si)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--sm-sub)",fontSize:13}}>✕</button>
                           </div>
 
@@ -1253,9 +1321,10 @@ export default function App() {
                                 const dir=setDirection(lastR,ex.target?.reps);
                                 const col=dir==="up"?"var(--sm-up)":dir==="down"?"#e05555":"var(--sm-sub)";
                                 const icon=dir==="up"?"↑":dir==="down"?"↓":"→";
+                                const repsDisplay=ex.unilateral&&(lastSet.repsL||lastSet.repsR)?`${lastSet.repsL||"—"}/${lastSet.repsR||"—"}`:`${lastR}`;
                                 return(
                                   <span style={{fontFamily:"var(--sm-font-mono)",fontSize:10,color:col,letterSpacing:".04em"}}>
-                                    {icon} {lastW}kg × {lastR}
+                                    {icon} {lastW}kg × {repsDisplay}
                                   </span>
                                 );
                               })()}
@@ -1409,11 +1478,14 @@ export default function App() {
                           </div>
                           {working.length>0&&(
                             <div style={{fontSize:12,color:"var(--sm-ink)",marginBottom:5,lineHeight:2,fontFamily:"var(--sm-font-mono)",letterSpacing:".02em"}}>
-                              {working.map((st,j)=>(
-                                <span key={j} style={{display:"inline-block",marginRight:7,whiteSpace:"nowrap",background:"var(--sm-card2)",borderRadius:8,padding:"2px 8px",border:"1px solid var(--sm-line)"}}>
-                                  <strong>{st.weight||"—"}</strong>×<strong>{st.reps||"—"}</strong>
-                                </span>
-                              ))}
+                              {working.map((st,j)=>{
+                                const repsDisp=(st.repsL||st.repsR)?`${st.repsL||"—"}/${st.repsR||"—"}`:(st.reps||"—");
+                                return(
+                                  <span key={j} style={{display:"inline-block",marginRight:7,whiteSpace:"nowrap",background:"var(--sm-card2)",borderRadius:8,padding:"2px 8px",border:"1px solid var(--sm-line)"}}>
+                                    <strong>{st.weight||"—"}</strong>×<strong>{repsDisp}</strong>
+                                  </span>
+                                );
+                              })}
                             </div>
                           )}
                           {warmupSets.length>0&&<div style={{fontSize:11,color:"var(--sm-sub)",marginBottom:4,fontFamily:"var(--sm-font-mono)"}}>W: {warmupSets.map(st=>`${st.weight||"—"}×${st.reps||"—"}`).join(" · ")}</div>}
