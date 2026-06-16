@@ -304,7 +304,7 @@ function ExercisePicker({ onSelect, onCancel, onRename, recentVariants, allExerc
 
         <div style={{overflowY:"auto",flex:1,padding:"8px 0"}}>
           <div style={{padding:"8px 20px 10px"}}>
-            <button onClick={()=>{setPicked(null);setEquipment("");setUnilateral(false);setGrip({});setGripNote("");setCustomName("");setCustomMuscle(MUSCLE_GROUPS[0]);setCustomMuscles([]);setCustomTension("neutre");setCustomGripProfile(null);setStep("custom");}} style={{...S.btnS,width:"100%",padding:"10px",fontSize:13,borderStyle:"dashed",borderRadius:16,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+            <button onClick={()=>{setPicked(null);setEquipment("");setUnilateral(false);setGrip({});setGripNote("");setCustomName("");setCustomMuscle(MUSCLE_GROUPS[0]);setCustomMuscles([]);setCustomTension("neutre");setStep("custom");}} style={{...S.btnS,width:"100%",padding:"10px",fontSize:13,borderStyle:"dashed",borderRadius:16,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
               <span style={{fontSize:16,lineHeight:1}}>+</span> Exercice personnalisé
             </button>
           </div>
