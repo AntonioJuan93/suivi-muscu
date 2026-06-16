@@ -4,6 +4,7 @@ import { MUSCLE_GROUPS, INITIAL_PROGRAMS, T, makeStyles, formatDate, calcVolume,
 import { loadData, saveData } from "./storage";
 import { supabase } from "./supabase";
 import { loadCloud, saveCloud, clearCloudCache, searchUserByEmail, fetchAllUsers } from "./cloud";
+import { EXERCISE_DB } from "./exercises";
 import Auth from "./Auth";
 
 const EQUIPMENT = [
@@ -45,6 +46,108 @@ function Ring({ value, max }) {
 
 function MonoLabel({ children }) {
   return <div style={{fontFamily:"var(--sm-font-mono)", fontSize:10, letterSpacing:".14em", color:"var(--sm-sub)", textTransform:"uppercase", marginBottom:4}}>{children}</div>;
+}
+
+function ExercisePicker({ onSelect, onCancel, recentVariants, S }) {
+  const [search, setSearch] = useState("");
+  const [muscleFilter, setMuscleFilter] = useState("");
+  const [equipFilter, setEquipFilter] = useState("");
+  const [customName, setCustomName] = useState("");
+  const [customMuscle, setCustomMuscle] = useState(MUSCLE_GROUPS[0]);
+  const [customEquip, setCustomEquip] = useState("");
+  const [showCustom, setShowCustom] = useState(false);
+
+  const filtered = EXERCISE_DB.filter(ex=>{
+    const matchSearch = !search || ex.name.toLowerCase().includes(search.toLowerCase());
+    const matchMuscle = !muscleFilter || ex.muscle === muscleFilter;
+    const matchEquip  = !equipFilter  || ex.equipment === equipFilter;
+    return matchSearch && matchMuscle && matchEquip;
+  });
+
+  const muscles = [...new Set(EXERCISE_DB.map(e=>e.muscle))];
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+      <div style={{background:"var(--sm-card)",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:640,maxHeight:"88vh",display:"flex",flexDirection:"column",boxShadow:"var(--sm-shadow)"}}>
+        {/* Header */}
+        <div style={{padding:"18px 20px 12px",borderBottom:"1px solid var(--sm-line)",flexShrink:0}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+            <span style={{fontFamily:"var(--sm-font-disp)",fontSize:22,color:"var(--sm-ink)"}}>Exercices</span>
+            <button onClick={onCancel} style={{background:"none",border:"none",cursor:"pointer",color:"var(--sm-sub)",fontSize:20,lineHeight:1}}>✕</button>
+          </div>
+          <input autoFocus value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher…" style={{...S.inp,marginBottom:10}}/>
+          <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4}}>
+            {["",  ...muscles].map(m=>(
+              <button key={m} onClick={()=>setMuscleFilter(m)} style={{fontFamily:"var(--sm-font-mono)",fontSize:10,letterSpacing:".06em",padding:"5px 12px",borderRadius:20,border:`1px solid ${muscleFilter===m?"var(--sm-accent)":"var(--sm-line)"}`,background:muscleFilter===m?"var(--sm-accent-soft)":"transparent",color:muscleFilter===m?"var(--sm-accent)":"var(--sm-sub)",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
+                {m||"Tous"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* List */}
+        <div style={{overflowY:"auto",flex:1,padding:"8px 0"}}>
+          {/* Récents */}
+          {!search&&!muscleFilter&&recentVariants?.length>0&&(
+            <div style={{padding:"6px 20px 10px"}}>
+              <div style={{fontFamily:"var(--sm-font-mono)",fontSize:10,letterSpacing:".1em",color:"var(--sm-sub)",textTransform:"uppercase",marginBottom:8}}>Récents</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {recentVariants.map(v=>(
+                  <button key={v.key} onClick={()=>onSelect({name:v.name,muscle:v.muscle||"",equipment:v.equipment||"",unilateral:false})}
+                    style={{...S.btnS,fontSize:12,padding:"5px 12px"}}>
+                    {v.name}{v.equipment&&<span style={{color:"var(--sm-accent)",marginLeft:4,fontSize:10}}>{v.equipment}</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* DB results */}
+          {filtered.map((ex,i)=>(
+            <button key={i} onClick={()=>onSelect(ex)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",padding:"11px 20px",background:"none",border:"none",borderBottom:"1px solid var(--sm-line)",cursor:"pointer",textAlign:"left",gap:10}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                  <span style={{fontSize:14,fontWeight:600,color:"var(--sm-ink)"}}>{ex.name}</span>
+                  {ex.unilateral&&<span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-up)",border:"1px solid var(--sm-up)",borderRadius:20,padding:"1px 6px",letterSpacing:".06em"}}>UNIL.</span>}
+                  {ex.category==="compound"&&<span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",letterSpacing:".04em"}}>poly</span>}
+                </div>
+                <div style={{fontSize:11,color:"var(--sm-sub)",marginTop:2,fontFamily:"var(--sm-font-mono)"}}>{ex.muscle}{ex.equipment?` · ${ex.equipment}`:""}</div>
+              </div>
+              <span style={{color:"var(--sm-accent)",fontSize:16,flexShrink:0}}>+</span>
+            </button>
+          ))}
+
+          {filtered.length===0&&!showCustom&&(
+            <div style={{padding:"20px",textAlign:"center",color:"var(--sm-sub)",fontFamily:"var(--sm-font-serif)",fontStyle:"italic",fontSize:14}}>
+              Aucun résultat — ajoute un exercice personnalisé ci-dessous.
+            </div>
+          )}
+
+          {/* Custom exercise */}
+          <div style={{padding:"12px 20px 24px"}}>
+            {!showCustom?(
+              <button onClick={()=>setShowCustom(true)} style={{...S.btnS,width:"100%",padding:"10px",fontSize:13}}>+ Exercice personnalisé</button>
+            ):(
+              <div style={{background:"var(--sm-card2)",borderRadius:16,padding:"14px",border:"1px solid var(--sm-line)"}}>
+                <MonoLabel>Exercice personnalisé</MonoLabel>
+                <input value={customName} onChange={e=>setCustomName(e.target.value)} placeholder="Nom de l'exercice" style={{...S.inp,marginBottom:8}}/>
+                <div style={{display:"flex",gap:8,marginBottom:10}}>
+                  <select value={customMuscle} onChange={e=>setCustomMuscle(e.target.value)} style={{...S.inp,flex:1,fontSize:12}}>
+                    {MUSCLE_GROUPS.map(m=><option key={m}>{m}</option>)}
+                  </select>
+                  <select value={customEquip} onChange={e=>setCustomEquip(e.target.value)} style={{...S.inp,flex:1,fontSize:12}}>
+                    {EQUIPMENT.map(eq=><option key={eq.v} value={eq.v}>{eq.l}</option>)}
+                  </select>
+                </div>
+                <button onClick={()=>customName.trim()&&onSelect({name:customName.trim(),muscle:customMuscle,equipment:customEquip,unilateral:false})}
+                  style={{...S.btnP,width:"100%"}}>Ajouter cet exercice</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function PartnerProfile({ data, email, S }) {
@@ -290,12 +393,10 @@ function ProgramEditor({ program, onSave, onCancel, S }) {
   const [exercises, setExercises] = useState(
     (program?.exercises||[]).map(ex=>typeof ex==="string"?{name:ex,targetSets:"",targetReps:"",muscle:"",equipment:""}:{muscle:"",equipment:"",...ex})
   );
-  const [newEx, setNewEx] = useState("");
-  const [newExMuscle, setNewExMuscle] = useState("");
-  const [newExEquip, setNewExEquip] = useState("");
+  const [showPicker, setShowPicker] = useState(false);
 
   function toggleMuscle(m){ setMuscles(ms=>ms.includes(m)?ms.filter(x=>x!==m):[...ms,m]); }
-  function addEx(){ if(!newEx.trim())return; setExercises(ex=>[...ex,{name:newEx.trim(),targetSets:"",targetReps:"",muscle:newExMuscle,equipment:newExEquip}]); setNewEx(""); setNewExMuscle(""); setNewExEquip(""); }
+  function addEx(picked){ setExercises(ex=>[...ex,{name:picked.name,targetSets:"",targetReps:"",muscle:picked.muscle||"",equipment:picked.equipment||"",unilateral:picked.unilateral||false}]); setShowPicker(false); }
   function removeEx(i){ setExercises(ex=>ex.filter((_,j)=>j!==i)); }
   function moveEx(i,dir){ setExercises(ex=>{ const a=[...ex],j=i+dir; if(j<0||j>=a.length)return a; [a[i],a[j]]=[a[j],a[i]]; return a; }); }
   function updateExField(i,field,val){ setExercises(ex=>ex.map((e,j)=>j===i?{...e,[field]:val}:e)); }
@@ -359,18 +460,10 @@ function ProgramEditor({ program, onSave, onCancel, S }) {
             </div>
           </div>
         ))}
-        <div style={{display:"flex",gap:6,marginBottom:8,marginTop:8,flexWrap:"wrap"}}>
-          <input value={newEx} onChange={e=>setNewEx(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addEx()} placeholder="Nom de l'exercice" style={{...S.inp,flex:2,minWidth:120}}/>
-          <button onClick={addEx} style={{...S.btnP,whiteSpace:"nowrap"}}>+ Ajouter</button>
-        </div>
-        <div style={{display:"flex",gap:6,marginBottom:20,flexWrap:"wrap"}}>
-          <select value={newExMuscle} onChange={e=>setNewExMuscle(e.target.value)} style={{...S.inp,flex:1,minWidth:110}}>
-            {["", ...MUSCLE_GROUPS].map(m=><option key={m} value={m}>{m||"Muscle..."}</option>)}
-          </select>
-          <select value={newExEquip} onChange={e=>setNewExEquip(e.target.value)} style={{...S.inp,flex:1,minWidth:110}}>
-            {EQUIPMENT.map(eq=><option key={eq.v} value={eq.v}>{eq.l}</option>)}
-          </select>
-        </div>
+        <button onClick={()=>setShowPicker(true)} style={{...S.btnS,width:"100%",padding:"11px",fontSize:13,borderStyle:"dashed",borderRadius:16,marginTop:8,marginBottom:20,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+          <span style={{fontSize:18,lineHeight:1}}>+</span> Choisir un exercice
+        </button>
+        {showPicker&&<ExercisePicker S={S} onSelect={addEx} onCancel={()=>setShowPicker(false)}/>}
         <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
           <button onClick={onCancel} style={S.btnS}>Annuler</button>
           <button onClick={()=>name.trim()&&onSave({name:name.trim(),type,muscles,exercises})} style={S.btnP}>Enregistrer</button>
@@ -414,6 +507,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [cloudLoaded, setCloudLoaded] = useState(false);
   const [authReady, setAuthReady] = useState(false);
+  const [showExPicker, setShowExPicker] = useState(false);
   const [partnerEmail, setPartnerEmail] = useState("");
   const [partnerData, setPartnerData] = useState(null);
   const [partnerLoading, setPartnerLoading] = useState(false);
@@ -615,14 +709,17 @@ export default function App() {
   function removeExercise(id){setExercises(ex=>ex.filter(e=>e.id!==id));}
   function updateExNotes(id,v){setExercises(ex=>ex.map(e=>e.id===id?{...e,notes:v}:e));}
 
-  function addExercise(nameOverride,equipOverride){
+  function addExercise(nameOverride,equipOverride,muscleOverride,unilateralOverride){
     const name=(nameOverride||newExName).trim();if(!name)return;
     const equipment=equipOverride!==undefined?equipOverride:newExEquipment;
-    let muscle=newExMuscle;
-    for(const s of sessions){const f=s.exercises.find(e=>e.name===name&&(e.equipment||"")===(equipment||""));if(f){muscle=f.muscle;break;}}
-    if(muscle===newExMuscle){for(const s of sessions){const f=s.exercises.find(e=>e.name===name);if(f){muscle=f.muscle;break;}}}
-    setExercises(ex=>[...ex,{id:Date.now(),name,muscle,equipment,notes:"",sets:[{weight:"",reps:"",rpe:"",isWarmup:false,restMs:null,note:""}]}]);
+    let muscle=muscleOverride||newExMuscle;
+    if(!muscleOverride){
+      for(const s of sessions){const f=s.exercises.find(e=>e.name===name&&(e.equipment||"")===(equipment||""));if(f){muscle=f.muscle;break;}}
+      if(muscle===newExMuscle){for(const s of sessions){const f=s.exercises.find(e=>e.name===name);if(f){muscle=f.muscle;break;}}}
+    }
+    setExercises(ex=>[...ex,{id:Date.now(),name,muscle,equipment,unilateral:unilateralOverride||false,notes:"",sets:[{weight:"",reps:"",rpe:"",isWarmup:false,restMs:null,note:""}]}]);
     setNewExName("");if(equipOverride===undefined)setNewExEquipment("");
+    setShowExPicker(false);
   }
 
   function saveSession(){
@@ -955,6 +1052,7 @@ export default function App() {
                     <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
                       <span style={{fontWeight:700,fontSize:15,color:"var(--sm-ink)"}}>{ex.name}</span>
                       <Tag>{ex.muscle}</Tag>
+                      {ex.unilateral&&<span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-up)",border:"1px solid var(--sm-up)",borderRadius:20,padding:"2px 7px",letterSpacing:".06em"}}>UNIL.</span>}
                       <select value={ex.equipment||""} onChange={e=>setExercises(xs=>xs.map(x=>x.id===ex.id?{...x,equipment:e.target.value}:x))} style={{fontSize:11,color:"var(--sm-sub)",background:"var(--sm-card2)",border:"1px solid var(--sm-line)",borderRadius:20,padding:"3px 8px",cursor:"pointer",outline:"none",fontFamily:"var(--sm-font-mono)",letterSpacing:".05em"}}>
                         {EQUIPMENT.map(eq=><option key={eq.v} value={eq.v}>{eq.l}</option>)}
                       </select>
@@ -970,7 +1068,7 @@ export default function App() {
                   )}
 
                   <div style={{display:"grid",gridTemplateColumns:"18px 22px 1fr 1fr 24px",gap:5,alignItems:"center",marginBottom:4}}>
-                    {["#","W","kg","Reps",""].map((h,i)=><span key={i} style={{fontSize:9,color:"var(--sm-sub)",textAlign:"center",fontFamily:"var(--sm-font-mono)",letterSpacing:".08em",textTransform:"uppercase"}}>{h}</span>)}
+                    {["#","W","kg",ex.unilateral?"Reps/côté":"Reps",""].map((h,i)=><span key={i} style={{fontSize:9,color:ex.unilateral&&i===3?"var(--sm-up)":"var(--sm-sub)",textAlign:"center",fontFamily:"var(--sm-font-mono)",letterSpacing:".08em",textTransform:"uppercase"}}>{h}</span>)}
                   </div>
 
                   {(()=>{
@@ -1051,30 +1149,14 @@ export default function App() {
               );
             })}
 
-            <div style={{...S.card,borderStyle:"dashed"}}>
-              <p style={{margin:"0 0 10px",fontSize:13,fontWeight:700,color:"var(--sm-ink)"}}>Ajouter un exercice</p>
-              {allExVariants.length>0&&(
-                <>
-                  <MonoLabel>Exercices récents</MonoLabel>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14}}>
-                    {allExVariants.filter(v=>!exercises.find(e=>e.name===v.name&&(e.equipment||"")===(v.equipment||""))).map(v=>(
-                      <button key={v.key} onClick={()=>addExercise(v.name,v.equipment)} style={{...S.btnS,fontSize:12,padding:"5px 14px"}}>
-                        {v.name}{v.equipment&&<span style={{color:"var(--sm-accent)",marginLeft:5,fontFamily:"var(--sm-font-mono)",fontSize:10}}>{equipLabel(v.equipment)}</span>}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-              <MonoLabel>Nouvel exercice</MonoLabel>
-              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
-                <input value={newExName} onChange={e=>setNewExName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addExercise()} placeholder="Nom de l'exercice" style={{...S.inp,flex:2,minWidth:150}}/>
-                <button onClick={()=>addExercise()} style={S.btnP}>Ajouter</button>
-              </div>
-              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                <select value={newExMuscle} onChange={e=>setNewExMuscle(e.target.value)} style={{...S.inp,flex:1,minWidth:120}}>{MUSCLE_GROUPS.map(m=><option key={m}>{m}</option>)}</select>
-                <select value={newExEquipment} onChange={e=>setNewExEquipment(e.target.value)} style={{...S.inp,flex:1,minWidth:120}}>{EQUIPMENT.map(eq=><option key={eq.v} value={eq.v}>{eq.l}</option>)}</select>
-              </div>
-            </div>
+            <button onClick={()=>setShowExPicker(true)} style={{...S.btnS,width:"100%",padding:"14px",fontSize:14,borderStyle:"dashed",borderRadius:20,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              <span style={{fontSize:20,lineHeight:1}}>+</span> Ajouter un exercice
+            </button>
+
+            {showExPicker&&<ExercisePicker S={S}
+              recentVariants={allExVariants.filter(v=>!exercises.find(e=>e.name===v.name&&(e.equipment||"")===(v.equipment||"")))}
+              onSelect={ex=>addExercise(ex.name,ex.equipment,ex.muscle,ex.unilateral)}
+              onCancel={()=>setShowExPicker(false)}/>}
 
             {exercises.length>0&&(
               <div style={S.card}>
