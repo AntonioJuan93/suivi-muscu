@@ -50,16 +50,45 @@ const GRIP_CONFIGS = {
   none:  { sections:[] },
 };
 
+const GRIP_PROFILE_LABELS = {
+  push:  {label:"Poussée",     desc:"Bench, développé, OHP"},
+  pull:  {label:"Tirage",      desc:"Rowing, tractions, tirage poulie"},
+  squat: {label:"Squat",       desc:"Squat, fentes bulgares, hack squat"},
+  hinge: {label:"Soulevé",     desc:"Deadlift, RDL, good morning"},
+  curl:  {label:"Curl",        desc:"Biceps, marteau, reverse"},
+  tri:   {label:"Triceps",     desc:"Extensions, barre au front, kickback"},
+  legs:  {label:"Jambes / Core",desc:"Leg press, hip thrust, abdos"},
+  none:  {label:"Aucune",      desc:"Pas d'options de prise"},
+};
+
 function getGripProfile(ex){
-  if(!ex)return"push";
+  if(ex?.gripProfile) return ex.gripProfile;     // override manuel prioritaire
+  if(!ex) return "push";
   const n=(ex.name||"").toLowerCase();
-  if(n.includes("squat")||n.includes("hack squat")||n.includes("gobelet"))return"squat";
-  if(n.includes("soulevé")||n.includes("deadlift")||n.includes("sl deadlift")||n.includes("roumain")||n.includes("good morning")||n.includes("hyperextension")||n.includes("nordic"))return"hinge";
-  if(n.includes("curl")||n.includes("zottman"))return"curl";
-  if(n.includes("dips triceps")||n.includes("extension triceps")||n.includes("barre au front")||n.includes("kickback triceps")||(n.includes("triceps")&&!n.includes("dips")))return"tri";
-  if(n.includes("fentes")||n.includes("presse à cuisses")||n.includes("leg extension")||n.includes("leg curl")||n.includes("abduction")||n.includes("kickback fessier")||n.includes("hip abduction")||n.includes("hip thrust")||n.includes("mollets")||n.includes("crunch")||n.includes("relevé")||n.includes("planche")||n.includes("russian")||n.includes("ab wheel"))return"legs";
-  if(n.includes("tractions")||n.includes("tirage")||n.includes("rowing")||n.includes("pull-over")||n.includes("kelso")||n.includes("face pull")||n.includes("oiseau")||n.includes("élévation")||n.includes("rowing menton"))return"pull";
-  return"push";
+  const m=(ex.muscle||"").toLowerCase();
+
+  // ── Squat pattern
+  if(n.includes("squat")||n.includes("hack squat")||n.includes("gobelet")||n.includes("bulgares")||n.includes("zercher")) return"squat";
+  // ── Hinge pattern
+  if(n.includes("soulevé")||n.includes("deadlift")||n.includes("sl deadlift")||n.includes("roumain")||n.includes("romanian")||n.includes("good morning")||n.includes("hyperextension")||n.includes("nordic")||n.includes("jefferson")) return"hinge";
+  // ── Curl / biceps
+  if(n.includes("curl")||n.includes("zottman")||n.includes("biceps poulie")||n.includes("reverse curl")) return"curl";
+  // ── Triceps
+  if(n.includes("dips triceps")||n.includes("extension triceps")||n.includes("barre au front")||n.includes("kickback triceps")||n.includes("skull crusher")||(n.includes("triceps")&&!n.includes("développé")&&!n.includes("dips"))) return"tri";
+  // ── Lower body / core
+  if(n.includes("fentes")||n.includes("presse à cuisses")||n.includes("leg extension")||n.includes("leg curl")||n.includes("abduction")||n.includes("kickback fessier")||n.includes("hip abduction")||n.includes("hip thrust")||n.includes("mollets")||n.includes("crunch")||n.includes("relevé de jambe")||n.includes("planche")||n.includes("russian twist")||n.includes("ab wheel")||n.includes("gainage")||n.includes("step-up")||n.includes("step up")) return"legs";
+  // ── Pull
+  if(n.includes("tractions")||n.includes("tirage")||n.includes("rowing")||n.includes("pull-over")||n.includes("pullover")||n.includes("kelso")||n.includes("face pull")||n.includes("oiseau")||n.includes("élévation")||n.includes("rowing menton")||n.includes("haussement")||n.includes("shrug")||n.includes("pulldown")) return"pull";
+
+  // ── Fallback musculaire
+  if(["biceps","avant-bras"].includes(m)) return"curl";
+  if(m==="triceps") return"tri";
+  if(["quadriceps","ischio-jambiers","mollets","fessiers","abdos"].includes(m)) return"legs";
+  if(["grand dorsaux","trapèzes"].includes(m)) return"pull";
+  if(["épaules postérieures","épaules latérales"].includes(m)) return"pull";
+  if(m==="lombaires") return"hinge";
+
+  return"push"; // pectoraux, épaules antérieures, défaut
 }
 
 // ── Design primitives ─────────────────────────────────────────────────────────
@@ -108,6 +137,7 @@ function ExercisePicker({ onSelect, onCancel, onRename, recentVariants, allExerc
   const [customMuscle, setCustomMuscle] = useState(MUSCLE_GROUPS[0]);
   const [customTension, setCustomTension] = useState("neutre");
   const [customMuscles, setCustomMuscles] = useState([]);
+  const [customGripProfile, setCustomGripProfile] = useState(null); // null = auto-detect
 
   const muscles = [...new Set(allExercises.map(e=>e.muscle))].sort();
 
@@ -131,7 +161,9 @@ function ExercisePicker({ onSelect, onCancel, onRename, recentVariants, allExerc
 
   function confirmCustom(){
     if(!customName.trim())return;
-    const ex={name:customName.trim(),muscle:customMuscle,muscles:customMuscles,category:"isolation",tension:customTension,custom:true};
+    const autoProfile=getGripProfile({name:customName,muscle:customMuscle});
+    const finalProfile=customGripProfile||autoProfile;
+    const ex={name:customName.trim(),muscle:customMuscle,muscles:customMuscles,category:"isolation",tension:customTension,custom:true,gripProfile:finalProfile};
     onSelect({...ex,equipment,unilateral,grip,gripNote});
   }
 
@@ -232,6 +264,36 @@ function ExercisePicker({ onSelect, onCancel, onRename, recentVariants, allExerc
               </button>
             ))}
           </div>
+
+          {(()=>{
+            const autoProfile=getGripProfile({name:customName,muscle:customMuscle});
+            const effective=customGripProfile||autoProfile;
+            return(
+              <>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+                  <MonoLabel>Profil de prise</MonoLabel>
+                  {!customGripProfile&&<span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-accent)",letterSpacing:".06em",padding:"2px 8px",borderRadius:20,background:"var(--sm-accent-soft)"}}>AUTO-DÉTECTÉ</span>}
+                  {customGripProfile&&<button onClick={()=>setCustomGripProfile(null)} style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",background:"none",border:"none",cursor:"pointer",letterSpacing:".06em",textDecoration:"underline"}}>Réinitialiser</button>}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:16}}>
+                  {Object.entries(GRIP_PROFILE_LABELS).map(([k,{label,desc}])=>{
+                    const isAuto=k===autoProfile&&!customGripProfile;
+                    const isSelected=k===effective;
+                    return(
+                      <button key={k} onClick={()=>setCustomGripProfile(k===autoProfile&&!customGripProfile?null:k)} style={{textAlign:"left",padding:"8px 10px",borderRadius:12,border:`1.5px solid ${isSelected?"var(--sm-accent)":"var(--sm-line)"}`,background:isSelected?"var(--sm-accent-soft)":"transparent",cursor:"pointer"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2}}>
+                          <span style={{fontSize:12,fontWeight:600,color:isSelected?"var(--sm-accent)":"var(--sm-ink)"}}>{label}</span>
+                          {isAuto&&<span style={{fontFamily:"var(--sm-font-mono)",fontSize:8,color:"var(--sm-accent)",letterSpacing:".06em"}}>auto</span>}
+                        </div>
+                        <div style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",lineHeight:1.3}}>{desc}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })()}
+
           <ConfigStep onConfirm={confirmCustom} customMode={true}/>
         </div>
       </div>
@@ -259,7 +321,7 @@ function ExercisePicker({ onSelect, onCancel, onRename, recentVariants, allExerc
 
         <div style={{overflowY:"auto",flex:1,padding:"8px 0"}}>
           <div style={{padding:"8px 20px 10px"}}>
-            <button onClick={()=>{setPicked(null);setEquipment("");setUnilateral(false);setGrip({});setGripNote("");setStep("custom");}} style={{...S.btnS,width:"100%",padding:"10px",fontSize:13,borderStyle:"dashed",borderRadius:16,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+            <button onClick={()=>{setPicked(null);setEquipment("");setUnilateral(false);setGrip({});setGripNote("");setCustomName("");setCustomMuscle(MUSCLE_GROUPS[0]);setCustomMuscles([]);setCustomTension("neutre");setCustomGripProfile(null);setStep("custom");}} style={{...S.btnS,width:"100%",padding:"10px",fontSize:13,borderStyle:"dashed",borderRadius:16,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
               <span style={{fontSize:16,lineHeight:1}}>+</span> Exercice personnalisé
             </button>
           </div>
@@ -901,11 +963,11 @@ export default function App() {
   function updateExNotes(id,v){setExercises(ex=>ex.map(e=>e.id===id?{...e,notes:v}:e));}
 
   function addExercise(picked){
-    const{name,muscle,equipment="",unilateral=false,grip={},gripNote="",custom=false,muscles=[],tension="",category=""}=picked;
+    const{name,muscle,equipment="",unilateral=false,grip={},gripNote="",custom=false,muscles=[],tension="",category="",gripProfile}=picked;
     if(!name?.trim())return;
     if(custom){
       const already=[...EXERCISE_DB,...customExercises].some(e=>e.name===name.trim()&&e.muscle===muscle);
-      if(!already) setCustomExercises(prev=>[...prev,{name:name.trim(),muscle,muscles,category,tension,custom:true}]);
+      if(!already) setCustomExercises(prev=>[...prev,{name:name.trim(),muscle,muscles,category,tension,gripProfile,custom:true}]);
     }
     const last=getLastForExercise(name,equipment);
     setExercises(ex=>[...ex,{id:Date.now(),name:name.trim(),muscle,equipment,unilateral,grip,gripNote,notes:"",sets:[{weight:last?.maxWeight?String(last.maxWeight):"",reps:"",rpe:"",isWarmup:false,restMs:null,note:""}]}]);
