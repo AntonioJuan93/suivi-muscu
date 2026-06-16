@@ -962,7 +962,7 @@ export default function App() {
     resetDraft();setMode("free");setTab("history");
   }
 
-  function exportJSON(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify({sessions,programs,theme:darkMode?"dark":""},null,2)],{type:"application/json"}));a.download="suivi_muscu.json";a.click();}
+  function exportJSON(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify({sessions,programs,customExercises,theme:darkMode?"dark":""},null,2)],{type:"application/json"}));a.download="suivi_muscu.json";a.click();}
   function exportCSV(){
     const rows=[["Date","Programme","Exercice","Muscle","Série","Échauffement","Poids","Reps","RPE","Volume","1RM","Repos (s)"]];
     sessions.forEach(s=>s.exercises.forEach(e=>e.sets.forEach((st,si)=>{
