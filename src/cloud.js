@@ -25,9 +25,10 @@ export async function searchUserByEmail(email) {
     .from("tracker")
     .select("data")
     .filter("data->>email", "eq", email.toLowerCase().trim())
-    .maybeSingle();
-  if (error || !data) return null;
-  return data.data;
+    .order("updated_at", { ascending: false })
+    .limit(1);
+  if (error || !data?.length) return null;
+  return data[0].data;
 }
 
 export async function fetchAllUsers() {
@@ -37,9 +38,14 @@ export async function fetchAllUsers() {
     .from("tracker")
     .select("data->>email");
   if (error || !data) return [];
+  const seen = new Set();
   return data
     .map(r => r.email)
-    .filter(e => e && e !== user.email);
+    .filter(e => {
+      if (!e || e === user.email || seen.has(e)) return false;
+      seen.add(e);
+      return true;
+    });
 }
 
 export async function saveCloud(appData) {
