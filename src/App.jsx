@@ -16,7 +16,8 @@ const EQUIPMENT = [
   {v:"smith",l:"Smith"},
 ];
 function equipLabel(v){ return EQUIPMENT.find(e=>e.v===v)?.l||""; }
-function exKey(name,equip){ return name+(equip?":::"+equip:""); }
+function gripKey(g){ if(!g)return""; return[g.orientation,g.width,g.barType].filter(Boolean).join("-"); }
+function exKey(name,equip,grip){ return name+(equip?":::"+equip:"")+(gripKey(grip)?":::"+gripKey(grip):""); }
 
 // ── Design primitives ─────────────────────────────────────────────────────────
 function Tag({ children }) {
@@ -48,28 +49,145 @@ function MonoLabel({ children }) {
   return <div style={{fontFamily:"var(--sm-font-mono)", fontSize:10, letterSpacing:".14em", color:"var(--sm-sub)", textTransform:"uppercase", marginBottom:4}}>{children}</div>;
 }
 
-function ExercisePicker({ onSelect, onCancel, recentVariants, S }) {
-  const [search, setSearch] = useState("");
-  const [muscleFilter, setMuscleFilter] = useState("");
-  const [equipFilter, setEquipFilter] = useState("");
-  const [customName, setCustomName] = useState("");
-  const [customMuscle, setCustomMuscle] = useState(MUSCLE_GROUPS[0]);
-  const [customEquip, setCustomEquip] = useState("");
-  const [showCustom, setShowCustom] = useState(false);
+const GRIP_ORIENTATIONS = [{v:"",l:"—"},{v:"pronation",l:"Pronation"},{v:"supination",l:"Supination"},{v:"neutre",l:"Neutre"}];
+const GRIP_WIDTHS      = [{v:"",l:"—"},{v:"etroit",l:"Étroit"},{v:"normal",l:"Normal"},{v:"large",l:"Large"}];
+const GRIP_BARS        = [{v:"",l:"—"},{v:"droite",l:"Barre droite"},{v:"ez",l:"Barre EZ"},{v:"trap",l:"Trap bar"}];
 
-  const filtered = EXERCISE_DB.filter(ex=>{
+function ExercisePicker({ onSelect, onCancel, recentVariants, allExercises, S }) {
+  const [step, setStep]               = useState("list"); // "list" | "configure" | "custom"
+  const [search, setSearch]           = useState("");
+  const [muscleFilter, setMuscleFilter] = useState("");
+  const [picked, setPicked]           = useState(null);
+  const [equipment, setEquipment]     = useState("");
+  const [unilateral, setUnilateral]   = useState(false);
+  const [grip, setGrip]               = useState({orientation:"",width:"",barType:""});
+  const [gripNote, setGripNote]       = useState("");
+  const [customName, setCustomName]   = useState("");
+  const [customMuscle, setCustomMuscle] = useState(MUSCLE_GROUPS[0]);
+  const [customTension, setCustomTension] = useState("neutre");
+  const [customMuscles, setCustomMuscles] = useState([]);
+
+  const muscles = [...new Set(allExercises.map(e=>e.muscle))].sort();
+
+  const filtered = allExercises.filter(ex=>{
     const matchSearch = !search || ex.name.toLowerCase().includes(search.toLowerCase());
     const matchMuscle = !muscleFilter || ex.muscle === muscleFilter;
-    const matchEquip  = !equipFilter  || ex.equipment === equipFilter;
-    return matchSearch && matchMuscle && matchEquip;
+    return matchSearch && matchMuscle;
   });
 
-  const muscles = [...new Set(EXERCISE_DB.map(e=>e.muscle))];
+  function pickExercise(ex){
+    setPicked(ex);
+    setEquipment("");setUnilateral(false);
+    setGrip({orientation:"",width:"",barType:""});setGripNote("");
+    setStep("configure");
+  }
 
+  function confirm(){
+    if(!picked)return;
+    onSelect({...picked,equipment,unilateral,grip,gripNote});
+  }
+
+  function confirmCustom(){
+    if(!customName.trim())return;
+    const ex={name:customName.trim(),muscle:customMuscle,muscles:customMuscles,category:"isolation",tension:customTension,custom:true};
+    onSelect({...ex,equipment,unilateral,grip,gripNote});
+  }
+
+  const tensionLabel = t => t==="etirement"?"Étirement":t==="contraction"?"Contraction":"Neutre";
+  const tensionColor = t => t==="etirement"?"var(--sm-up)":t==="contraction"?"var(--sm-accent)":"var(--sm-sub)";
+
+  const ConfigStep = ({onConfirm})=>(
+    <div style={{padding:"16px 20px 32px",overflowY:"auto",flex:1}}>
+      <div style={{fontFamily:"var(--sm-font-disp)",fontSize:22,color:"var(--sm-ink)",marginBottom:4}}>{picked?.name||customName}</div>
+      {picked?.muscle&&<div style={{fontFamily:"var(--sm-font-mono)",fontSize:11,color:"var(--sm-sub)",marginBottom:16}}>{picked.muscle}{picked.muscles?.length>0?` · ${picked.muscles.slice(0,2).join(", ")}`:""}</div>}
+
+      <MonoLabel>Équipement</MonoLabel>
+      <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:16}}>
+        {EQUIPMENT.map(eq=>(
+          <button key={eq.v} onClick={()=>setEquipment(eq.v)} style={{fontFamily:"var(--sm-font-mono)",fontSize:11,padding:"6px 14px",borderRadius:20,border:`1px solid ${equipment===eq.v?"var(--sm-accent)":"var(--sm-line)"}`,background:equipment===eq.v?"var(--sm-accent-soft)":"transparent",color:equipment===eq.v?"var(--sm-accent)":"var(--sm-sub)",cursor:"pointer"}}>
+            {eq.l||"Aucun"}
+          </button>
+        ))}
+      </div>
+
+      <MonoLabel>Unilatéral</MonoLabel>
+      <div style={{display:"flex",gap:8,marginBottom:16}}>
+        {[[false,"Non"],[true,"Oui — / côté"]].map(([v,l])=>(
+          <button key={String(v)} onClick={()=>setUnilateral(v)} style={{flex:1,padding:"8px",borderRadius:14,border:`1px solid ${unilateral===v?"var(--sm-up)":"var(--sm-line)"}`,background:unilateral===v?"rgba(47,158,109,.12)":"transparent",color:unilateral===v?"var(--sm-up)":"var(--sm-sub)",cursor:"pointer",fontSize:12,fontFamily:"var(--sm-font-mono)"}}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      <MonoLabel>Prise</MonoLabel>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:8}}>
+        {[["Orientation",GRIP_ORIENTATIONS,"orientation"],["Largeur",GRIP_WIDTHS,"width"],["Barre",GRIP_BARS,"barType"]].map(([label,opts,field])=>(
+          <div key={field}>
+            <div style={{fontSize:9,color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".08em",marginBottom:4,textTransform:"uppercase"}}>{label}</div>
+            <select value={grip[field]} onChange={e=>setGrip(g=>({...g,[field]:e.target.value}))} style={{...S.inp,fontSize:11,padding:"6px 8px"}}>
+              {opts.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
+            </select>
+          </div>
+        ))}
+      </div>
+      <input value={gripNote} onChange={e=>setGripNote(e.target.value)} placeholder="Note de prise libre (ex: prise triangle, neutre serré…)" style={{...S.inp,fontSize:12,marginBottom:20}}/>
+
+      <button onClick={onConfirm} style={{...S.btnP,width:"100%",padding:"14px",fontSize:14}}>Ajouter à la séance</button>
+    </div>
+  );
+
+  if(step==="configure") return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+      <div style={{background:"var(--sm-card)",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:640,maxHeight:"92vh",display:"flex",flexDirection:"column",boxShadow:"var(--sm-shadow)"}}>
+        <div style={{padding:"16px 20px 12px",borderBottom:"1px solid var(--sm-line)",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+          <button onClick={()=>setStep("list")} style={{background:"none",border:"none",cursor:"pointer",color:"var(--sm-sub)",fontSize:13,fontFamily:"var(--sm-font-mono)"}}>← Retour</button>
+          <button onClick={onCancel} style={{background:"none",border:"none",cursor:"pointer",color:"var(--sm-sub)",fontSize:20}}>✕</button>
+        </div>
+        <ConfigStep onConfirm={confirm}/>
+      </div>
+    </div>
+  );
+
+  if(step==="custom") return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+      <div style={{background:"var(--sm-card)",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:640,maxHeight:"92vh",display:"flex",flexDirection:"column",boxShadow:"var(--sm-shadow)"}}>
+        <div style={{padding:"16px 20px 12px",borderBottom:"1px solid var(--sm-line)",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+          <button onClick={()=>setStep("list")} style={{background:"none",border:"none",cursor:"pointer",color:"var(--sm-sub)",fontSize:13,fontFamily:"var(--sm-font-mono)"}}>← Retour</button>
+          <button onClick={onCancel} style={{background:"none",border:"none",cursor:"pointer",color:"var(--sm-sub)",fontSize:20}}>✕</button>
+        </div>
+        <div style={{overflowY:"auto",flex:1,padding:"16px 20px 32px"}}>
+          <MonoLabel>Nom</MonoLabel>
+          <input value={customName} onChange={e=>setCustomName(e.target.value)} placeholder="Nom de l'exercice" style={{...S.inp,marginBottom:12}}/>
+          <MonoLabel>Muscle principal</MonoLabel>
+          <select value={customMuscle} onChange={e=>setCustomMuscle(e.target.value)} style={{...S.inp,marginBottom:12}}>
+            {MUSCLE_GROUPS.map(m=><option key={m}>{m}</option>)}
+          </select>
+          <MonoLabel>Muscles secondaires</MonoLabel>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+            {MUSCLE_GROUPS.filter(m=>m!==customMuscle).map(m=>(
+              <button key={m} onClick={()=>setCustomMuscles(ms=>ms.includes(m)?ms.filter(x=>x!==m):[...ms,m])} style={{fontSize:11,padding:"4px 12px",borderRadius:20,border:`1px solid ${customMuscles.includes(m)?"var(--sm-accent)":"var(--sm-line)"}`,background:customMuscles.includes(m)?"var(--sm-accent-soft)":"transparent",color:customMuscles.includes(m)?"var(--sm-accent)":"var(--sm-sub)",cursor:"pointer",fontFamily:"var(--sm-font-mono)"}}>
+                {m}
+              </button>
+            ))}
+          </div>
+          <MonoLabel>Tension maximale</MonoLabel>
+          <div style={{display:"flex",gap:8,marginBottom:20}}>
+            {[["etirement","Étirement"],["contraction","Contraction"],["neutre","Neutre"]].map(([v,l])=>(
+              <button key={v} onClick={()=>setCustomTension(v)} style={{flex:1,padding:"8px",borderRadius:14,border:`1px solid ${customTension===v?tensionColor(v):"var(--sm-line)"}`,background:customTension===v?`${tensionColor(v)}22`:"transparent",color:customTension===v?tensionColor(v):"var(--sm-sub)",cursor:"pointer",fontSize:11,fontFamily:"var(--sm-font-mono)"}}>
+                {l}
+              </button>
+            ))}
+          </div>
+          <ConfigStep onConfirm={confirmCustom}/>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── Step LIST ──────────────────────────────────────────────────────────────────
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
       <div style={{background:"var(--sm-card)",borderRadius:"24px 24px 0 0",width:"100%",maxWidth:640,maxHeight:"88vh",display:"flex",flexDirection:"column",boxShadow:"var(--sm-shadow)"}}>
-        {/* Header */}
         <div style={{padding:"18px 20px 12px",borderBottom:"1px solid var(--sm-line)",flexShrink:0}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
             <span style={{fontFamily:"var(--sm-font-disp)",fontSize:22,color:"var(--sm-ink)"}}>Exercices</span>
@@ -77,7 +195,7 @@ function ExercisePicker({ onSelect, onCancel, recentVariants, S }) {
           </div>
           <input autoFocus value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher…" style={{...S.inp,marginBottom:10}}/>
           <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4}}>
-            {["",  ...muscles].map(m=>(
+            {["",...muscles].map(m=>(
               <button key={m} onClick={()=>setMuscleFilter(m)} style={{fontFamily:"var(--sm-font-mono)",fontSize:10,letterSpacing:".06em",padding:"5px 12px",borderRadius:20,border:`1px solid ${muscleFilter===m?"var(--sm-accent)":"var(--sm-line)"}`,background:muscleFilter===m?"var(--sm-accent-soft)":"transparent",color:muscleFilter===m?"var(--sm-accent)":"var(--sm-sub)",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
                 {m||"Tous"}
               </button>
@@ -85,16 +203,13 @@ function ExercisePicker({ onSelect, onCancel, recentVariants, S }) {
           </div>
         </div>
 
-        {/* List */}
         <div style={{overflowY:"auto",flex:1,padding:"8px 0"}}>
-          {/* Récents */}
           {!search&&!muscleFilter&&recentVariants?.length>0&&(
             <div style={{padding:"6px 20px 10px"}}>
               <div style={{fontFamily:"var(--sm-font-mono)",fontSize:10,letterSpacing:".1em",color:"var(--sm-sub)",textTransform:"uppercase",marginBottom:8}}>Récents</div>
               <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                 {recentVariants.map(v=>(
-                  <button key={v.key} onClick={()=>onSelect({name:v.name,muscle:v.muscle||"",equipment:v.equipment||"",unilateral:false})}
-                    style={{...S.btnS,fontSize:12,padding:"5px 12px"}}>
+                  <button key={v.key} onClick={()=>{setPicked({name:v.name,muscle:v.muscle||"",muscles:[],category:"",tension:""});setEquipment(v.equipment||"");setUnilateral(v.unilateral||false);setStep("configure");}} style={{...S.btnS,fontSize:12,padding:"5px 12px"}}>
                     {v.name}{v.equipment&&<span style={{color:"var(--sm-accent)",marginLeft:4,fontSize:10}}>{v.equipment}</span>}
                   </button>
                 ))}
@@ -102,47 +217,29 @@ function ExercisePicker({ onSelect, onCancel, recentVariants, S }) {
             </div>
           )}
 
-          {/* DB results */}
           {filtered.map((ex,i)=>(
-            <button key={i} onClick={()=>onSelect(ex)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",padding:"11px 20px",background:"none",border:"none",borderBottom:"1px solid var(--sm-line)",cursor:"pointer",textAlign:"left",gap:10}}>
+            <button key={i} onClick={()=>pickExercise(ex)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",padding:"11px 20px",background:"none",border:"none",borderBottom:"1px solid var(--sm-line)",cursor:"pointer",textAlign:"left",gap:10}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                   <span style={{fontSize:14,fontWeight:600,color:"var(--sm-ink)"}}>{ex.name}</span>
-                  {ex.unilateral&&<span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-up)",border:"1px solid var(--sm-up)",borderRadius:20,padding:"1px 6px",letterSpacing:".06em"}}>UNIL.</span>}
+                  {ex.custom&&<span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",border:"1px solid var(--sm-line)",borderRadius:20,padding:"1px 6px"}}>custom</span>}
                   {ex.category==="compound"&&<span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",letterSpacing:".04em"}}>poly</span>}
+                  {ex.tension&&<span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:tensionColor(ex.tension),letterSpacing:".04em"}}>{tensionLabel(ex.tension)}</span>}
                 </div>
-                <div style={{fontSize:11,color:"var(--sm-sub)",marginTop:2,fontFamily:"var(--sm-font-mono)"}}>{ex.muscle}{ex.equipment?` · ${ex.equipment}`:""}</div>
+                <div style={{fontSize:11,color:"var(--sm-sub)",marginTop:2,fontFamily:"var(--sm-font-mono)"}}>{ex.muscle}{ex.muscles?.length>0?` · ${ex.muscles.slice(0,2).join(", ")}`:""}</div>
               </div>
-              <span style={{color:"var(--sm-accent)",fontSize:16,flexShrink:0}}>+</span>
+              <span style={{color:"var(--sm-accent)",fontSize:16,flexShrink:0}}>›</span>
             </button>
           ))}
 
-          {filtered.length===0&&!showCustom&&(
-            <div style={{padding:"20px",textAlign:"center",color:"var(--sm-sub)",fontFamily:"var(--sm-font-serif)",fontStyle:"italic",fontSize:14}}>
-              Aucun résultat — ajoute un exercice personnalisé ci-dessous.
-            </div>
+          {filtered.length===0&&(
+            <div style={{padding:"20px",textAlign:"center",color:"var(--sm-sub)",fontFamily:"var(--sm-font-serif)",fontStyle:"italic",fontSize:14}}>Aucun résultat.</div>
           )}
 
-          {/* Custom exercise */}
           <div style={{padding:"12px 20px 24px"}}>
-            {!showCustom?(
-              <button onClick={()=>setShowCustom(true)} style={{...S.btnS,width:"100%",padding:"10px",fontSize:13}}>+ Exercice personnalisé</button>
-            ):(
-              <div style={{background:"var(--sm-card2)",borderRadius:16,padding:"14px",border:"1px solid var(--sm-line)"}}>
-                <MonoLabel>Exercice personnalisé</MonoLabel>
-                <input value={customName} onChange={e=>setCustomName(e.target.value)} placeholder="Nom de l'exercice" style={{...S.inp,marginBottom:8}}/>
-                <div style={{display:"flex",gap:8,marginBottom:10}}>
-                  <select value={customMuscle} onChange={e=>setCustomMuscle(e.target.value)} style={{...S.inp,flex:1,fontSize:12}}>
-                    {MUSCLE_GROUPS.map(m=><option key={m}>{m}</option>)}
-                  </select>
-                  <select value={customEquip} onChange={e=>setCustomEquip(e.target.value)} style={{...S.inp,flex:1,fontSize:12}}>
-                    {EQUIPMENT.map(eq=><option key={eq.v} value={eq.v}>{eq.l}</option>)}
-                  </select>
-                </div>
-                <button onClick={()=>customName.trim()&&onSelect({name:customName.trim(),muscle:customMuscle,equipment:customEquip,unilateral:false})}
-                  style={{...S.btnP,width:"100%"}}>Ajouter cet exercice</button>
-              </div>
-            )}
+            <button onClick={()=>{setPicked(null);setEquipment("");setUnilateral(false);setGrip({orientation:"",width:"",barType:""});setGripNote("");setStep("custom");}} style={{...S.btnS,width:"100%",padding:"10px",fontSize:13}}>
+              + Exercice personnalisé
+            </button>
           </div>
         </div>
       </div>
@@ -386,7 +483,7 @@ function NumRating({ value, onChange }) {
   );
 }
 
-function ProgramEditor({ program, onSave, onCancel, S }) {
+function ProgramEditor({ program, onSave, onCancel, S, allExercisesList }) {
   const [name, setName] = useState(program?.name||"");
   const [type, setType] = useState(program?.type||"volume");
   const [muscles, setMuscles] = useState(program?.muscles||[]);
@@ -411,7 +508,7 @@ function ProgramEditor({ program, onSave, onCancel, S }) {
         <MonoLabel>Type d'entraînement</MonoLabel>
         <div style={{display:"flex",gap:8,marginBottom:16}}>
           {[["force","Force","Faibles reps, charges lourdes"],["volume","Volume","Hautes reps, hypertrophie"]].map(([v,l,d])=>(
-            <button key={v} onClick={()=>{setType(v);if(!program?.defaultReps)setDefaultReps(v==="force"?"4-6":"8-12");}} style={{flex:1,padding:"10px 8px",borderRadius:14,border:`1.5px solid ${type===v?"var(--sm-accent)":"var(--sm-line)"}`,background:type===v?"var(--sm-accent-soft)":"transparent",cursor:"pointer",textAlign:"left"}}>
+            <button key={v} onClick={()=>setType(v)} style={{flex:1,padding:"10px 8px",borderRadius:14,border:`1.5px solid ${type===v?"var(--sm-accent)":"var(--sm-line)"}`,background:type===v?"var(--sm-accent-soft)":"transparent",cursor:"pointer",textAlign:"left"}}>
               <div style={{fontSize:12,fontWeight:700,color:type===v?"var(--sm-accent)":"var(--sm-ink)",marginBottom:2}}>{l}</div>
               <div style={{fontSize:10,color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)"}}>{d}</div>
             </button>
@@ -463,7 +560,7 @@ function ProgramEditor({ program, onSave, onCancel, S }) {
         <button onClick={()=>setShowPicker(true)} style={{...S.btnS,width:"100%",padding:"11px",fontSize:13,borderStyle:"dashed",borderRadius:16,marginTop:8,marginBottom:20,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
           <span style={{fontSize:18,lineHeight:1}}>+</span> Choisir un exercice
         </button>
-        {showPicker&&<ExercisePicker S={S} onSelect={addEx} onCancel={()=>setShowPicker(false)}/>}
+        {showPicker&&<ExercisePicker S={S} allExercises={allExercisesList} onSelect={addEx} onCancel={()=>setShowPicker(false)}/>}
         <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
           <button onClick={onCancel} style={S.btnS}>Annuler</button>
           <button onClick={()=>name.trim()&&onSave({name:name.trim(),type,muscles,exercises})} style={S.btnP}>Enregistrer</button>
@@ -498,9 +595,6 @@ export default function App() {
   const [sessionSleep, setSessionSleep] = useState(null);
   const [sessionEnergy, setSessionEnergy] = useState(null);
   const [exercises, setExercises] = useState([]);
-  const [newExName, setNewExName] = useState("");
-  const [newExMuscle, setNewExMuscle] = useState(MUSCLE_GROUPS[0]);
-  const [newExEquipment, setNewExEquipment] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [ready, setReady] = useState(false);
@@ -508,6 +602,7 @@ export default function App() {
   const [cloudLoaded, setCloudLoaded] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   const [showExPicker, setShowExPicker] = useState(false);
+  const [customExercises, setCustomExercises] = useState([]);
   const [partnerEmail, setPartnerEmail] = useState("");
   const [partnerData, setPartnerData] = useState(null);
   const [partnerLoading, setPartnerLoading] = useState(false);
@@ -515,6 +610,7 @@ export default function App() {
   const [partnerUsers, setPartnerUsers] = useState([]);
 
   const S = useMemo(()=>makeStyles(),[]);
+  const allExercisesList = useMemo(()=>[...EXERCISE_DB,...customExercises],[customExercises]);
   const saveTimer = useRef(null);
 
   useEffect(()=>{ document.documentElement.dataset.theme = darkMode?"dark":""; },[darkMode]);
@@ -543,11 +639,13 @@ export default function App() {
     if(avg<2)return 0.90; if(avg<2.5)return 0.94; if(avg<3.5)return 0.97; return 1.0;
   }
 
-  function getLastForExercise(name,equipment){
+  function getLastForExercise(name,equipment,grip){
     const sorted=[...sessions].sort((a,b)=>b.date.localeCompare(a.date));
-    const lastS=sorted.find(s=>s.exercises.some(e=>e.name===name&&(e.equipment||"")===(equipment||"")));
+    const gk=gripKey(grip);
+    const match=e=>e.name===name&&(e.equipment||"")===(equipment||"")&&(!gk||gripKey(e.grip)===gk);
+    const lastS=sorted.find(s=>s.exercises.some(match));
     if(!lastS)return null;
-    const ex=lastS.exercises.find(e=>e.name===name&&(e.equipment||"")===(equipment||""));
+    const ex=lastS.exercises.find(match);
     const working=(ex.sets||[]).filter(s=>!s.isWarmup&&(s.weight||s.reps));
     const daysAgo=Math.round((Date.now()-new Date(lastS.date))/86400000);
     const maxW=Math.max(0,...working.map(s=>parseFloat(s.weight)||0));
@@ -582,7 +680,7 @@ export default function App() {
 
   // ── Persistence ───────────────────────────────────────────────────────────
   function fullData(){
-    return{sessions,programs,theme:darkMode?"dark":"",email:user?.email||"",
+    return{sessions,programs,customExercises,theme:darkMode?"dark":"",email:user?.email||"",
       draft:{exercises,sessionDate,sessionDuration,sessionNotes,sessionBodyweight,sessionRating,sessionSleep,sessionEnergy,mode,selectedProgram}};
   }
 
@@ -600,6 +698,7 @@ export default function App() {
     if(!d)return;
     if(d.sessions)setSessions(d.sessions);
     if(d.programs)setPrograms(d.programs);
+    if(d.customExercises)setCustomExercises(d.customExercises);
     if(d.theme==="dark")setDarkMode(true);
     if(withDraft&&d.draft){
       const dr=d.draft;
@@ -709,16 +808,15 @@ export default function App() {
   function removeExercise(id){setExercises(ex=>ex.filter(e=>e.id!==id));}
   function updateExNotes(id,v){setExercises(ex=>ex.map(e=>e.id===id?{...e,notes:v}:e));}
 
-  function addExercise(nameOverride,equipOverride,muscleOverride,unilateralOverride){
-    const name=(nameOverride||newExName).trim();if(!name)return;
-    const equipment=equipOverride!==undefined?equipOverride:newExEquipment;
-    let muscle=muscleOverride||newExMuscle;
-    if(!muscleOverride){
-      for(const s of sessions){const f=s.exercises.find(e=>e.name===name&&(e.equipment||"")===(equipment||""));if(f){muscle=f.muscle;break;}}
-      if(muscle===newExMuscle){for(const s of sessions){const f=s.exercises.find(e=>e.name===name);if(f){muscle=f.muscle;break;}}}
+  function addExercise(picked){
+    const{name,muscle,equipment="",unilateral=false,grip={},gripNote="",custom=false,muscles=[],tension="",category=""}=picked;
+    if(!name?.trim())return;
+    if(custom){
+      const already=[...EXERCISE_DB,...customExercises].some(e=>e.name===name.trim()&&e.muscle===muscle);
+      if(!already) setCustomExercises(prev=>[...prev,{name:name.trim(),muscle,muscles,category,tension,custom:true}]);
     }
-    setExercises(ex=>[...ex,{id:Date.now(),name,muscle,equipment,unilateral:unilateralOverride||false,notes:"",sets:[{weight:"",reps:"",rpe:"",isWarmup:false,restMs:null,note:""}]}]);
-    setNewExName("");if(equipOverride===undefined)setNewExEquipment("");
+    const last=getLastForExercise(name,equipment);
+    setExercises(ex=>[...ex,{id:Date.now(),name:name.trim(),muscle,equipment,unilateral,grip,gripNote,notes:"",sets:[{weight:last?.maxWeight?String(last.maxWeight):"",reps:"",rpe:"",isWarmup:false,restMs:null,note:""}]}]);
     setShowExPicker(false);
   }
 
@@ -875,7 +973,7 @@ export default function App() {
   // ── Main app ──────────────────────────────────────────────────────────────
   return (
     <div style={{paddingBottom:72,background:"var(--sm-bg)",minHeight:"100vh",color:"var(--sm-ink)"}}>
-      {editingProgram!==null&&<ProgramEditor program={editingProgram==="new"?null:editingProgram} onSave={saveProgram} onCancel={()=>setEditingProgram(null)} S={S}/>}
+      {editingProgram!==null&&<ProgramEditor program={editingProgram==="new"?null:editingProgram} onSave={saveProgram} onCancel={()=>setEditingProgram(null)} S={S} allExercisesList={allExercisesList}/>}
 
       {confirmDelete&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:12}}>
@@ -1061,6 +1159,12 @@ export default function App() {
                     <button onClick={()=>removeExercise(ex.id)} style={{...S.btnS,padding:"4px 10px",fontSize:11,flexShrink:0}}>✕</button>
                   </div>
 
+                  {(ex.grip&&gripKey(ex.grip)||ex.gripNote)&&(
+                    <div style={{fontSize:10,color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".04em",marginBottom:6,display:"flex",gap:8,flexWrap:"wrap"}}>
+                      {gripKey(ex.grip)&&<span style={{background:"var(--sm-card2)",borderRadius:20,padding:"2px 8px",border:"1px solid var(--sm-line)"}}>{[ex.grip.orientation,ex.grip.width,ex.grip.barType].filter(Boolean).join(" · ")}</span>}
+                      {ex.gripNote&&<span style={{fontStyle:"italic",color:"var(--sm-sub)"}}>{ex.gripNote}</span>}
+                    </div>
+                  )}
                   {last&&(
                     <div style={{fontSize:10,marginBottom:8,color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".04em"}}>
                       {last.daysAgo===0?"Aujourd'hui":last.daysAgo===1?"Hier":`Il y a ${last.daysAgo}j`}
@@ -1154,8 +1258,9 @@ export default function App() {
             </button>
 
             {showExPicker&&<ExercisePicker S={S}
+              allExercises={[...EXERCISE_DB,...customExercises]}
               recentVariants={allExVariants.filter(v=>!exercises.find(e=>e.name===v.name&&(e.equipment||"")===(v.equipment||"")))}
-              onSelect={ex=>addExercise(ex.name,ex.equipment,ex.muscle,ex.unilateral)}
+              onSelect={addExercise}
               onCancel={()=>setShowExPicker(false)}/>}
 
             {exercises.length>0&&(
