@@ -91,6 +91,17 @@ function getGripProfile(ex){
   return"push"; // pectoraux, épaules antérieures, défaut
 }
 
+function getAdaptedSections(profile, equipment) {
+  const base = (GRIP_CONFIGS[profile] || GRIP_CONFIGS.push).sections;
+  return base.filter(s => {
+    if (s.key === "barType") return !equipment || equipment === "barre";
+    if (s.key === "barPos") return !equipment || equipment === "barre" || equipment === "smith";
+    if (s.key === "handle") return !equipment || equipment === "poulie";
+    if (s.key === "width" && equipment === "alteres" && (profile === "pull" || profile === "curl")) return false;
+    return true;
+  });
+}
+
 // ── Design primitives ─────────────────────────────────────────────────────────
 function Tag({ children }) {
   return <span style={{ fontSize:10, fontFamily:"var(--sm-font-mono)", letterSpacing:"0.09em", background:"var(--sm-accent-soft)", color:"var(--sm-accent)", padding:"3px 9px", borderRadius:"var(--sm-r-pill)", textTransform:"uppercase", whiteSpace:"nowrap" }}>{children}</span>;
@@ -137,7 +148,6 @@ function ExercisePicker({ onSelect, onCancel, onRename, recentVariants, allExerc
   const [customMuscle, setCustomMuscle] = useState(MUSCLE_GROUPS[0]);
   const [customTension, setCustomTension] = useState("neutre");
   const [customMuscles, setCustomMuscles] = useState([]);
-  const [customGripProfile, setCustomGripProfile] = useState(null); // null = auto-detect
 
   const muscles = [...new Set(allExercises.map(e=>e.muscle))].sort();
 
@@ -161,8 +171,7 @@ function ExercisePicker({ onSelect, onCancel, onRename, recentVariants, allExerc
 
   function confirmCustom(){
     if(!customName.trim())return;
-    const autoProfile=getGripProfile({name:customName,muscle:customMuscle});
-    const finalProfile=customGripProfile||autoProfile;
+    const finalProfile=getGripProfile({name:customName,muscle:customMuscle});
     const ex={name:customName.trim(),muscle:customMuscle,muscles:customMuscles,category:"isolation",tension:customTension,custom:true,gripProfile:finalProfile};
     onSelect({...ex,equipment,unilateral,grip,gripNote});
   }
@@ -173,7 +182,7 @@ function ExercisePicker({ onSelect, onCancel, onRename, recentVariants, allExerc
   const ConfigStep = ({onConfirm, customMode=false})=>{
     const exForProfile = customMode ? {name:customName,muscle:customMuscle} : picked;
     const profile = getGripProfile(exForProfile);
-    const gripConfig = GRIP_CONFIGS[profile] || GRIP_CONFIGS.push;
+    const sections = getAdaptedSections(profile, equipment);
     const displayName = customMode ? (customName||"Exercice perso") : (picked?.name||"");
     const displayMuscle = customMode ? customMuscle : (picked?.muscle||"");
     const displayMuscles = customMode ? [] : (picked?.muscles||[]);
@@ -200,11 +209,14 @@ function ExercisePicker({ onSelect, onCancel, onRename, recentVariants, allExerc
         ))}
       </div>
 
-      {gripConfig.sections.length>0&&(
+      {sections.length>0&&(
         <>
-          <MonoLabel>Prise / Position</MonoLabel>
-          <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(gripConfig.sections.length,3)},1fr)`,gap:8,marginBottom:8}}>
-            {gripConfig.sections.map(sec=>(
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+            <MonoLabel>Prise / Position</MonoLabel>
+            <span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-accent)",letterSpacing:".06em",padding:"2px 8px",borderRadius:20,background:"var(--sm-accent-soft)"}}>{GRIP_PROFILE_LABELS[profile]?.label}</span>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(sections.length,3)},1fr)`,gap:8,marginBottom:8}}>
+            {sections.map(sec=>(
               <div key={sec.key}>
                 <div style={{fontSize:9,color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".08em",marginBottom:4,textTransform:"uppercase"}}>{sec.label}</div>
                 <select value={grip[sec.key]||""} onChange={e=>setGrip(g=>({...g,[sec.key]:e.target.value}))} style={{...S.inp,fontSize:11,padding:"6px 8px"}}>
@@ -215,7 +227,7 @@ function ExercisePicker({ onSelect, onCancel, onRename, recentVariants, allExerc
           </div>
         </>
       )}
-      <input value={gripNote} onChange={e=>setGripNote(e.target.value)} placeholder={gripConfig.sections.length>0?"Note complémentaire…":"Note de prise (ex: prise triangle, neutre serré…)"} style={{...S.inp,fontSize:12,marginBottom:20}}/>
+      <input value={gripNote} onChange={e=>setGripNote(e.target.value)} placeholder={sections.length>0?"Note complémentaire…":"Note de prise (ex: prise triangle, neutre serré…)"} style={{...S.inp,fontSize:12,marginBottom:20}}/>
 
       <button onClick={onConfirm} style={{...S.btnP,width:"100%",padding:"14px",fontSize:14}}>Ajouter à la séance</button>
     </div>
@@ -264,35 +276,6 @@ function ExercisePicker({ onSelect, onCancel, onRename, recentVariants, allExerc
               </button>
             ))}
           </div>
-
-          {(()=>{
-            const autoProfile=getGripProfile({name:customName,muscle:customMuscle});
-            const effective=customGripProfile||autoProfile;
-            return(
-              <>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
-                  <MonoLabel>Profil de prise</MonoLabel>
-                  {!customGripProfile&&<span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-accent)",letterSpacing:".06em",padding:"2px 8px",borderRadius:20,background:"var(--sm-accent-soft)"}}>AUTO-DÉTECTÉ</span>}
-                  {customGripProfile&&<button onClick={()=>setCustomGripProfile(null)} style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",background:"none",border:"none",cursor:"pointer",letterSpacing:".06em",textDecoration:"underline"}}>Réinitialiser</button>}
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:16}}>
-                  {Object.entries(GRIP_PROFILE_LABELS).map(([k,{label,desc}])=>{
-                    const isAuto=k===autoProfile&&!customGripProfile;
-                    const isSelected=k===effective;
-                    return(
-                      <button key={k} onClick={()=>setCustomGripProfile(k===autoProfile&&!customGripProfile?null:k)} style={{textAlign:"left",padding:"8px 10px",borderRadius:12,border:`1.5px solid ${isSelected?"var(--sm-accent)":"var(--sm-line)"}`,background:isSelected?"var(--sm-accent-soft)":"transparent",cursor:"pointer"}}>
-                        <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2}}>
-                          <span style={{fontSize:12,fontWeight:600,color:isSelected?"var(--sm-accent)":"var(--sm-ink)"}}>{label}</span>
-                          {isAuto&&<span style={{fontFamily:"var(--sm-font-mono)",fontSize:8,color:"var(--sm-accent)",letterSpacing:".06em"}}>auto</span>}
-                        </div>
-                        <div style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",lineHeight:1.3}}>{desc}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
-            );
-          })()}
 
           <ConfigStep onConfirm={confirmCustom} customMode={true}/>
         </div>
