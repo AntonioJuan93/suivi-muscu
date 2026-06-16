@@ -53,7 +53,7 @@ const GRIP_ORIENTATIONS = [{v:"",l:"—"},{v:"pronation",l:"Pronation"},{v:"supi
 const GRIP_WIDTHS      = [{v:"",l:"—"},{v:"etroit",l:"Étroit"},{v:"normal",l:"Normal"},{v:"large",l:"Large"}];
 const GRIP_BARS        = [{v:"",l:"—"},{v:"droite",l:"Barre droite"},{v:"ez",l:"Barre EZ"},{v:"trap",l:"Trap bar"}];
 
-function ExercisePicker({ onSelect, onCancel, recentVariants, allExercises, S }) {
+function ExercisePicker({ onSelect, onCancel, onRename, recentVariants, allExercises, S }) {
   const [step, setStep]               = useState("list"); // "list" | "configure" | "custom"
   const [search, setSearch]           = useState("");
   const [muscleFilter, setMuscleFilter] = useState("");
@@ -62,6 +62,8 @@ function ExercisePicker({ onSelect, onCancel, recentVariants, allExercises, S })
   const [unilateral, setUnilateral]   = useState(false);
   const [grip, setGrip]               = useState({orientation:"",width:"",barType:""});
   const [gripNote, setGripNote]       = useState("");
+  const [renamingName, setRenamingName] = useState(null);
+  const [renameVal, setRenameVal]     = useState("");
   const [customName, setCustomName]   = useState("");
   const [customMuscle, setCustomMuscle] = useState(MUSCLE_GROUPS[0]);
   const [customTension, setCustomTension] = useState("neutre");
@@ -217,20 +219,38 @@ function ExercisePicker({ onSelect, onCancel, recentVariants, allExercises, S })
             </div>
           )}
 
-          {filtered.map((ex,i)=>(
-            <button key={i} onClick={()=>pickExercise(ex)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",padding:"11px 20px",background:"none",border:"none",borderBottom:"1px solid var(--sm-line)",cursor:"pointer",textAlign:"left",gap:10}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                  <span style={{fontSize:14,fontWeight:600,color:"var(--sm-ink)"}}>{ex.name}</span>
-                  {ex.custom&&<span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",border:"1px solid var(--sm-line)",borderRadius:20,padding:"1px 6px"}}>custom</span>}
-                  {ex.category==="compound"&&<span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",letterSpacing:".04em"}}>poly</span>}
-                  {ex.tension&&<span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:tensionColor(ex.tension),letterSpacing:".04em"}}>{tensionLabel(ex.tension)}</span>}
-                </div>
-                <div style={{fontSize:11,color:"var(--sm-sub)",marginTop:2,fontFamily:"var(--sm-font-mono)"}}>{ex.muscle}{ex.muscles?.length>0?` · ${ex.muscles.slice(0,2).join(", ")}`:""}</div>
+          {filtered.map((ex,i)=>{
+            if(renamingName===ex.name) return(
+              <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 14px 9px 20px",borderBottom:"1px solid var(--sm-line)",background:"var(--sm-card2)"}}>
+                <input autoFocus value={renameVal} onChange={e=>setRenameVal(e.target.value)}
+                  onKeyDown={e=>{
+                    if(e.key==="Enter"){onRename&&onRename(ex.name,renameVal.trim());setRenamingName(null);}
+                    if(e.key==="Escape")setRenamingName(null);
+                  }}
+                  style={{...S.inp,flex:1,fontSize:13,padding:"6px 10px"}}/>
+                <button onClick={()=>{onRename&&onRename(ex.name,renameVal.trim());setRenamingName(null);}} style={{...S.btnP,padding:"6px 14px",fontSize:12,flexShrink:0}}>✓</button>
+                <button onClick={()=>setRenamingName(null)} style={{...S.btnS,padding:"6px 10px",fontSize:12,flexShrink:0}}>✕</button>
               </div>
-              <span style={{color:"var(--sm-accent)",fontSize:16,flexShrink:0}}>›</span>
-            </button>
-          ))}
+            );
+            return(
+              <div key={i} style={{display:"flex",alignItems:"center",borderBottom:"1px solid var(--sm-line)"}}>
+                <button onClick={()=>pickExercise(ex)} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"11px 8px 11px 20px",background:"none",border:"none",cursor:"pointer",textAlign:"left",gap:8,minWidth:0}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                      <span style={{fontSize:14,fontWeight:600,color:"var(--sm-ink)"}}>{ex.name}</span>
+                      {ex.custom&&!ex.originalName&&<span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",border:"1px solid var(--sm-line)",borderRadius:20,padding:"1px 6px"}}>custom</span>}
+                      {ex.sessionDerived&&<span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",border:"1px solid var(--sm-line)",borderRadius:20,padding:"1px 6px"}}>hist.</span>}
+                      {ex.category==="compound"&&<span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",letterSpacing:".04em"}}>poly</span>}
+                      {ex.tension&&<span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:tensionColor(ex.tension),letterSpacing:".04em"}}>{tensionLabel(ex.tension)}</span>}
+                    </div>
+                    <div style={{fontSize:11,color:"var(--sm-sub)",marginTop:2,fontFamily:"var(--sm-font-mono)"}}>{ex.muscle}{ex.muscles?.length>0?` · ${ex.muscles.slice(0,2).join(", ")}`:""}</div>
+                  </div>
+                  <span style={{color:"var(--sm-accent)",fontSize:16,flexShrink:0}}>›</span>
+                </button>
+                <button onClick={()=>{setRenamingName(ex.name);setRenameVal(ex.name);}} title="Renommer" style={{padding:"11px 14px",background:"none",border:"none",cursor:"pointer",color:"var(--sm-sub)",fontSize:14,flexShrink:0,lineHeight:1}}>✎</button>
+              </div>
+            );
+          })}
 
           {filtered.length===0&&(
             <div style={{padding:"20px",textAlign:"center",color:"var(--sm-sub)",fontFamily:"var(--sm-font-serif)",fontStyle:"italic",fontSize:14}}>Aucun résultat.</div>
@@ -483,7 +503,7 @@ function NumRating({ value, onChange }) {
   );
 }
 
-function ProgramEditor({ program, onSave, onCancel, S, allExercisesList }) {
+function ProgramEditor({ program, onSave, onCancel, S, allExercisesList, onRename }) {
   const [name, setName] = useState(program?.name||"");
   const [type, setType] = useState(program?.type||"volume");
   const [muscles, setMuscles] = useState(program?.muscles||[]);
@@ -560,7 +580,7 @@ function ProgramEditor({ program, onSave, onCancel, S, allExercisesList }) {
         <button onClick={()=>setShowPicker(true)} style={{...S.btnS,width:"100%",padding:"11px",fontSize:13,borderStyle:"dashed",borderRadius:16,marginTop:8,marginBottom:20,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
           <span style={{fontSize:18,lineHeight:1}}>+</span> Choisir un exercice
         </button>
-        {showPicker&&<ExercisePicker S={S} allExercises={allExercisesList} onSelect={addEx} onCancel={()=>setShowPicker(false)}/>}
+        {showPicker&&<ExercisePicker S={S} allExercises={allExercisesList} onSelect={addEx} onRename={onRename} onCancel={()=>setShowPicker(false)}/>}
         <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
           <button onClick={onCancel} style={S.btnS}>Annuler</button>
           <button onClick={()=>name.trim()&&onSave({name:name.trim(),type,muscles,exercises})} style={S.btnP}>Enregistrer</button>
@@ -610,7 +630,20 @@ export default function App() {
   const [partnerUsers, setPartnerUsers] = useState([]);
 
   const S = useMemo(()=>makeStyles(),[]);
-  const allExercisesList = useMemo(()=>[...EXERCISE_DB,...customExercises],[customExercises]);
+  const allExercisesList = useMemo(()=>{
+    const overriddenDBNames = new Set(customExercises.filter(e=>e.originalName).map(e=>e.originalName));
+    const filteredDB = EXERCISE_DB.filter(e=>!overriddenDBNames.has(e.name));
+    const knownNames = new Set([...EXERCISE_DB.map(e=>e.name),...customExercises.map(e=>e.name)]);
+    const seen = new Set();
+    const sessionDerived = [];
+    sessions.forEach(s=>s.exercises.forEach(e=>{
+      if(e.name?.trim()&&!knownNames.has(e.name)&&!seen.has(e.name)){
+        seen.add(e.name);
+        sessionDerived.push({name:e.name,muscle:e.muscle||"",muscles:[],category:"",tension:"",sessionDerived:true});
+      }
+    }));
+    return [...filteredDB,...customExercises,...sessionDerived];
+  },[customExercises,sessions]);
   const saveTimer = useRef(null);
 
   useEffect(()=>{ document.documentElement.dataset.theme = darkMode?"dark":""; },[darkMode]);
@@ -820,6 +853,22 @@ export default function App() {
     setShowExPicker(false);
   }
 
+  function renameExercise(oldName, newName){
+    const trimmed=(newName||"").trim();
+    if(!trimmed||trimmed===oldName)return;
+    const inCustom=customExercises.find(e=>e.name===oldName);
+    const inDB=EXERCISE_DB.some(e=>e.name===oldName);
+    if(inCustom){
+      setCustomExercises(prev=>prev.map(e=>e.name===oldName?{...e,name:trimmed}:e));
+    } else if(inDB){
+      const dbEx=EXERCISE_DB.find(e=>e.name===oldName);
+      setCustomExercises(prev=>[...prev,{...dbEx,name:trimmed,originalName:oldName,custom:true}]);
+    }
+    setSessions(prev=>prev.map(s=>({...s,exercises:s.exercises.map(e=>e.name===oldName?{...e,name:trimmed}:e)})));
+    setPrograms(prev=>prev.map(p=>({...p,exercises:(p.exercises||[]).map(e=>typeof e==="string"?(e===oldName?trimmed:e):(e.name===oldName?{...e,name:trimmed}:e))})));
+    setProgressKey(pk=>{if(!pk)return pk;const parts=pk.split(":::");if(parts[0]===oldName)return[trimmed,...parts.slice(1)].join(":::");return pk;});
+  }
+
   function saveSession(){
     if(!exercises.length)return;
     const clean=exercises.map(e=>({...e,sets:e.sets.filter(s=>s.weight||s.reps)})).filter(e=>e.sets.length);
@@ -973,7 +1022,7 @@ export default function App() {
   // ── Main app ──────────────────────────────────────────────────────────────
   return (
     <div style={{paddingBottom:72,background:"var(--sm-bg)",minHeight:"100vh",color:"var(--sm-ink)"}}>
-      {editingProgram!==null&&<ProgramEditor program={editingProgram==="new"?null:editingProgram} onSave={saveProgram} onCancel={()=>setEditingProgram(null)} S={S} allExercisesList={allExercisesList}/>}
+      {editingProgram!==null&&<ProgramEditor program={editingProgram==="new"?null:editingProgram} onSave={saveProgram} onCancel={()=>setEditingProgram(null)} S={S} allExercisesList={allExercisesList} onRename={renameExercise}/>}
 
       {confirmDelete&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:12}}>
@@ -1258,9 +1307,10 @@ export default function App() {
             </button>
 
             {showExPicker&&<ExercisePicker S={S}
-              allExercises={[...EXERCISE_DB,...customExercises]}
+              allExercises={allExercisesList}
               recentVariants={allExVariants.filter(v=>!exercises.find(e=>e.name===v.name&&(e.equipment||"")===(v.equipment||"")))}
               onSelect={addExercise}
+              onRename={renameExercise}
               onCancel={()=>setShowExPicker(false)}/>}
 
             {exercises.length>0&&(
