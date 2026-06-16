@@ -286,8 +286,6 @@ function NumRating({ value, onChange }) {
 function ProgramEditor({ program, onSave, onCancel, S }) {
   const [name, setName] = useState(program?.name||"");
   const [type, setType] = useState(program?.type||"volume");
-  const [defaultReps, setDefaultReps] = useState(program?.defaultReps||(program?.type==="force"?"4-6":"8-12"));
-  const [defaultSets, setDefaultSets] = useState(program?.defaultSets||"3");
   const [muscles, setMuscles] = useState(program?.muscles||[]);
   const [exercises, setExercises] = useState(
     (program?.exercises||[]).map(ex=>typeof ex==="string"?{name:ex,targetSets:"",targetReps:"",muscle:"",equipment:""}:{muscle:"",equipment:"",...ex})
@@ -319,19 +317,8 @@ function ProgramEditor({ program, onSave, onCancel, S }) {
           ))}
         </div>
 
-        <MonoLabel>Cibles par défaut (pour tous les exercices)</MonoLabel>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
-          <div>
-            <div style={{fontSize:10,color:"var(--sm-sub)",marginBottom:4,fontFamily:"var(--sm-font-mono)"}}>Séries</div>
-            <input value={defaultSets} onChange={e=>setDefaultSets(e.target.value)} placeholder="ex: 3 ou 4-5" style={{...S.inp,fontSize:13}}/>
-          </div>
-          <div>
-            <div style={{fontSize:10,color:"var(--sm-sub)",marginBottom:4,fontFamily:"var(--sm-font-mono)"}}>Répétitions</div>
-            <input value={defaultReps} onChange={e=>setDefaultReps(e.target.value)} placeholder="ex: 8-12 ou 5" style={{...S.inp,fontSize:13}}/>
-          </div>
-        </div>
         <div style={{marginBottom:16,padding:"10px 12px",background:"var(--sm-faint)",borderRadius:12,fontSize:11,color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".04em"}}>
-          Logique : si toutes les séries atteignent le MAX de la fourchette → ↑ Augmenter. Dans la fourchette → → Maintenir. Sous le MIN → ↓ Alléger.
+          Logique : si toutes les séries atteignent le MAX → ↑ Augmenter. Dans la fourchette → → Maintenir. Sous le MIN → ↓ Alléger.
         </div>
         <MonoLabel>Groupes musculaires</MonoLabel>
         <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:16}}>
@@ -359,10 +346,16 @@ function ProgramEditor({ program, onSave, onCancel, S }) {
                 {EQUIPMENT.map(eq=><option key={eq.v} value={eq.v}>{eq.l}</option>)}
               </select>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"52px 10px 1fr",gap:6,alignItems:"center"}}>
-              <input type="number" value={ex.targetSets||""} onChange={e=>updateExField(i,"targetSets",e.target.value)} placeholder="Sér." min="1" style={{...S.inp,fontSize:12,padding:"6px 6px",textAlign:"center"}}/>
-              <span style={{fontSize:11,color:"var(--sm-sub)",textAlign:"center"}}>×</span>
-              <input value={ex.targetReps||""} onChange={e=>updateExField(i,"targetReps",e.target.value)} placeholder="Reps (6-8, 5…)" style={{...S.inp,fontSize:12,padding:"6px 8px"}}/>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 10px 1fr",gap:6,alignItems:"center"}}>
+              <div>
+                <div style={{fontSize:9,color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".08em",marginBottom:3,textTransform:"uppercase"}}>Séries cible</div>
+                <input type="number" value={ex.targetSets||""} onChange={e=>updateExField(i,"targetSets",e.target.value)} placeholder="ex: 3" min="1" style={{...S.inp,fontSize:12,padding:"6px 8px",textAlign:"center"}}/>
+              </div>
+              <span style={{fontSize:11,color:"var(--sm-sub)",textAlign:"center",paddingTop:18}}>×</span>
+              <div>
+                <div style={{fontSize:9,color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".08em",marginBottom:3,textTransform:"uppercase"}}>Reps cible</div>
+                <input value={ex.targetReps||""} onChange={e=>updateExField(i,"targetReps",e.target.value)} placeholder="ex: 6-8" style={{...S.inp,fontSize:12,padding:"6px 8px"}}/>
+              </div>
             </div>
           </div>
         ))}
@@ -380,7 +373,7 @@ function ProgramEditor({ program, onSave, onCancel, S }) {
         </div>
         <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
           <button onClick={onCancel} style={S.btnS}>Annuler</button>
-          <button onClick={()=>name.trim()&&onSave({name:name.trim(),type,defaultReps,defaultSets,muscles,exercises})} style={S.btnP}>Enregistrer</button>
+          <button onClick={()=>name.trim()&&onSave({name:name.trim(),type,muscles,exercises})} style={S.btnP}>Enregistrer</button>
         </div>
       </div>
     </div>
@@ -581,8 +574,8 @@ export default function App() {
       const equipment=typeof ex==="object"&&ex.equipment?ex.equipment:"";
       const exMuscle=typeof ex==="object"&&ex.muscle?ex.muscle:null;
       const muscle=exMuscle||p.muscles[Math.min(i,p.muscles.length-1)]||MUSCLE_GROUPS[0];
-      const targetReps=(typeof ex==="object"&&ex.targetReps)||p.defaultReps||"";
-      const targetSets=parseInt((typeof ex==="object"&&ex.targetSets)||p.defaultSets||"3")||3;
+      const targetReps=(typeof ex==="object"&&ex.targetReps)||"";
+      const targetSets=parseInt((typeof ex==="object"&&ex.targetSets)||"3")||3;
       const last=getLastForExercise(name,equipment);
       const defaultWeight=last?.maxWeight?String(last.maxWeight):"";
       const sets=Array.from({length:targetSets},()=>({weight:defaultWeight,reps:"",rpe:"",isWarmup:false,restMs:null,note:""}));
