@@ -18,9 +18,9 @@ export const MUSCLE_GROUPS = [
 ];
 
 export const INITIAL_PROGRAMS = [
-  { id:1, name:"Push (Poussée)", muscles:["Pectoraux","Pectoraux supérieurs","Épaules antérieures","Épaules latérales","Triceps"], exercises:["Développé couché","Développé militaire","Écarté poulie","Triceps poulie"] },
-  { id:2, name:"Pull (Tirage)", muscles:["Grand dorsaux","Trapèzes","Biceps"], exercises:["Tractions","Rowing barre","Curl barre","Tirage poulie haute"] },
-  { id:3, name:"Legs (Jambes)", muscles:["Quadriceps","Ischio-jambiers","Mollets","Fessiers"], exercises:["Squat","Presse à cuisses","Fentes","Leg curl","Hip thrust","Mollets debout"] },
+  { id:1, name:"Push (Poussée)", type:"volume", defaultReps:"8-12", defaultSets:"3", muscles:["Pectoraux","Pectoraux supérieurs","Épaules antérieures","Épaules latérales","Triceps"], exercises:["Développé couché","Développé militaire","Écarté poulie","Triceps poulie"] },
+  { id:2, name:"Pull (Tirage)", type:"volume", defaultReps:"8-12", defaultSets:"3", muscles:["Grand dorsaux","Trapèzes","Biceps"], exercises:["Tractions","Rowing barre","Curl barre","Tirage poulie haute"] },
+  { id:3, name:"Legs (Jambes)", type:"volume", defaultReps:"8-12", defaultSets:"3", muscles:["Quadriceps","Ischio-jambiers","Mollets","Fessiers"], exercises:["Squat","Presse à cuisses","Fentes","Leg curl","Hip thrust","Mollets debout"] },
 ];
 
 /* T — toutes les valeurs pointent vers les CSS variables PULSE.

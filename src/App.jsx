@@ -285,6 +285,9 @@ function NumRating({ value, onChange }) {
 
 function ProgramEditor({ program, onSave, onCancel, S }) {
   const [name, setName] = useState(program?.name||"");
+  const [type, setType] = useState(program?.type||"volume");
+  const [defaultReps, setDefaultReps] = useState(program?.defaultReps||(program?.type==="force"?"4-6":"8-12"));
+  const [defaultSets, setDefaultSets] = useState(program?.defaultSets||"3");
   const [muscles, setMuscles] = useState(program?.muscles||[]);
   const [exercises, setExercises] = useState(
     (program?.exercises||[]).map(ex=>typeof ex==="string"?{name:ex,targetSets:"",targetReps:"",muscle:"",equipment:""}:{muscle:"",equipment:"",...ex})
@@ -305,6 +308,31 @@ function ProgramEditor({ program, onSave, onCancel, S }) {
         <h3 style={{margin:"0 0 16px",fontSize:16,fontWeight:700,color:"var(--sm-ink)"}}>{program?"Modifier":"Nouveau programme"}</h3>
         <MonoLabel>Nom</MonoLabel>
         <input value={name} onChange={e=>setName(e.target.value)} placeholder="Ex: Push A" style={{...S.inp,marginBottom:16}}/>
+
+        <MonoLabel>Type d'entraînement</MonoLabel>
+        <div style={{display:"flex",gap:8,marginBottom:16}}>
+          {[["force","Force","Faibles reps, charges lourdes"],["volume","Volume","Hautes reps, hypertrophie"]].map(([v,l,d])=>(
+            <button key={v} onClick={()=>{setType(v);if(!program?.defaultReps)setDefaultReps(v==="force"?"4-6":"8-12");}} style={{flex:1,padding:"10px 8px",borderRadius:14,border:`1.5px solid ${type===v?"var(--sm-accent)":"var(--sm-line)"}`,background:type===v?"var(--sm-accent-soft)":"transparent",cursor:"pointer",textAlign:"left"}}>
+              <div style={{fontSize:12,fontWeight:700,color:type===v?"var(--sm-accent)":"var(--sm-ink)",marginBottom:2}}>{l}</div>
+              <div style={{fontSize:10,color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)"}}>{d}</div>
+            </button>
+          ))}
+        </div>
+
+        <MonoLabel>Cibles par défaut (pour tous les exercices)</MonoLabel>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
+          <div>
+            <div style={{fontSize:10,color:"var(--sm-sub)",marginBottom:4,fontFamily:"var(--sm-font-mono)"}}>Séries</div>
+            <input value={defaultSets} onChange={e=>setDefaultSets(e.target.value)} placeholder="ex: 3 ou 4-5" style={{...S.inp,fontSize:13}}/>
+          </div>
+          <div>
+            <div style={{fontSize:10,color:"var(--sm-sub)",marginBottom:4,fontFamily:"var(--sm-font-mono)"}}>Répétitions</div>
+            <input value={defaultReps} onChange={e=>setDefaultReps(e.target.value)} placeholder="ex: 8-12 ou 5" style={{...S.inp,fontSize:13}}/>
+          </div>
+        </div>
+        <div style={{marginBottom:16,padding:"10px 12px",background:"var(--sm-faint)",borderRadius:12,fontSize:11,color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".04em"}}>
+          Logique : si toutes les séries atteignent le MAX de la fourchette → ↑ Augmenter. Dans la fourchette → → Maintenir. Sous le MIN → ↓ Alléger.
+        </div>
         <MonoLabel>Groupes musculaires</MonoLabel>
         <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:16}}>
           {MUSCLE_GROUPS.map(m=>(
@@ -352,7 +380,7 @@ function ProgramEditor({ program, onSave, onCancel, S }) {
         </div>
         <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
           <button onClick={onCancel} style={S.btnS}>Annuler</button>
-          <button onClick={()=>name.trim()&&onSave({name:name.trim(),muscles,exercises})} style={S.btnP}>Enregistrer</button>
+          <button onClick={()=>name.trim()&&onSave({name:name.trim(),type,defaultReps,defaultSets,muscles,exercises})} style={S.btnP}>Enregistrer</button>
         </div>
       </div>
     </div>
@@ -440,28 +468,29 @@ export default function App() {
   }
 
   function getSuggestion(name,equipment,targetReps){
+    if(!targetReps)return null;
     const last=getLastForExercise(name,equipment);
-    if(!last||!last.maxWeight)return null;
+    if(!last)return null;
     const[minR,maxR]=parseRepRange(targetReps);
-    const working=last.sets.filter(s=>s.reps);
+    if(!minR)return null;
+    const working=last.sets.filter(s=>parseInt(s.reps)>0);
     if(!working.length)return null;
-    const mult=getWellnessMultiplier();
-    let type,weight,reps,reason;
-    if(maxR){
-      const allAtMax=working.every(s=>(parseInt(s.reps)||0)>=maxR);
-      const avgReps=Math.round(working.reduce((a,s)=>a+(parseInt(s.reps)||0),0)/working.length);
-      if(allAtMax){weight=last.maxWeight+2.5;reps=minR||maxR;reason=`Toutes les séries à ${maxR} reps → poids +2.5kg`;type="weight";}
-      else{weight=last.maxWeight;reps=Math.min(maxR,avgReps+1);reason=`Vise ${reps} reps (max ${maxR}) avant d'augmenter`;type="reps";}
-    } else {
-      const withRPE=last.sets.filter(s=>s.rpe);
-      const avgRPE=withRPE.length?withRPE.reduce((a,s)=>a+(parseFloat(s.rpe)||0),0)/withRPE.length:null;
-      if(!avgRPE||avgRPE<7){weight=last.maxWeight+5;type="weight";reason="RPE faible → progression +5kg";}
-      else if(avgRPE<=8.5){weight=last.maxWeight+2.5;type="weight";reason="Bonne séance → +2.5kg";}
-      else{weight=last.maxWeight;type="hold";reason="RPE élevé → consolide le poids actuel";}
-      reps=null;
-    }
-    if(mult<1&&type==="weight"){const adj=Math.round(weight*mult*2)/2;return{type,weight:adj,reps,reason,wellnessNote:`Forme réduite → ${adj}kg`};}
-    return{type,weight,reps,reason};
+    const top=maxR||minR;
+    const allAtTop=working.every(s=>(parseInt(s.reps)||0)>=top);
+    const allInRange=working.every(s=>(parseInt(s.reps)||0)>=minR);
+    if(allAtTop)return{direction:"up",reason:`Toutes les séries ≥ ${top} reps — augmenter le poids`};
+    if(allInRange)return{direction:"hold",reason:`Dans la fourchette — vise ${top} reps sur toutes les séries`};
+    return{direction:"down",reason:`Reps sous la cible (min ${minR}) — consolider le poids actuel`};
+  }
+
+  function setDirection(setReps,targetReps){
+    if(!targetReps||!parseInt(setReps))return null;
+    const[minR,maxR]=parseRepRange(targetReps);
+    if(!minR)return null;
+    const r=parseInt(setReps)||0;
+    if(r>=(maxR||minR))return"up";
+    if(r>=minR)return"hold";
+    return"down";
   }
 
   // ── Persistence ───────────────────────────────────────────────────────────
@@ -552,13 +581,12 @@ export default function App() {
       const equipment=typeof ex==="object"&&ex.equipment?ex.equipment:"";
       const exMuscle=typeof ex==="object"&&ex.muscle?ex.muscle:null;
       const muscle=exMuscle||p.muscles[Math.min(i,p.muscles.length-1)]||MUSCLE_GROUPS[0];
-      const targetSets=typeof ex==="object"&&ex.targetSets?parseInt(ex.targetSets)||1:1;
-      const targetReps=typeof ex==="object"&&ex.targetReps?ex.targetReps:"";
-      const sugg=getSuggestion(name,equipment,targetReps);
-      const defaultWeight=sugg?String(sugg.weight):"";
-      const defaultReps=targetReps?targetReps.split("-")[0]:"";
-      const sets=Array.from({length:targetSets},()=>({weight:defaultWeight,reps:defaultReps,rpe:"",isWarmup:false,restMs:null,note:""}));
-      return{id:now+i,name,muscle,equipment,notes:"",sets,target:{sets:targetSets,reps:targetReps}};
+      const targetReps=(typeof ex==="object"&&ex.targetReps)||p.defaultReps||"";
+      const targetSets=parseInt((typeof ex==="object"&&ex.targetSets)||p.defaultSets||"3")||3;
+      const last=getLastForExercise(name,equipment);
+      const defaultWeight=last?.maxWeight?String(last.maxWeight):"";
+      const sets=Array.from({length:targetSets},()=>({weight:defaultWeight,reps:"",rpe:"",isWarmup:false,restMs:null,note:""}));
+      return{id:now+i,name,muscle,equipment,notes:"",sets,target:{sets:targetSets,reps:targetReps,type:p.type||"volume"}};
     }));
   }
 
@@ -849,8 +877,12 @@ export default function App() {
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
                 {programs.map(p=>(
                   <button key={p.id} onClick={()=>{loadProgram(p);setTab("log");}} style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"var(--sm-card2)",border:"1px solid var(--sm-line)",borderRadius:16,padding:"12px 16px",cursor:"pointer",textAlign:"left",width:"100%"}}>
-                    <div>
-                      <div style={{fontSize:14,fontWeight:600,color:"var(--sm-ink)",marginBottom:3}}>{p.name}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:3,flexWrap:"wrap"}}>
+                        <span style={{fontSize:14,fontWeight:600,color:"var(--sm-ink)"}}>{p.name}</span>
+                        {p.type&&<span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,letterSpacing:".08em",padding:"2px 7px",borderRadius:20,background:p.type==="force"?"rgba(245,158,11,.15)":"var(--sm-accent-soft)",color:p.type==="force"?"#f59e0b":"var(--sm-accent)",border:`1px solid ${p.type==="force"?"#f59e0b":"var(--sm-accent)"}`,textTransform:"uppercase"}}>{p.type==="force"?"Force":"Volume"}</span>}
+                        {p.defaultReps&&<span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)"}}>{p.defaultSets}×{p.defaultReps}</span>}
+                      </div>
                       <div style={{fontFamily:"var(--sm-font-mono)",fontSize:10,color:"var(--sm-sub)",letterSpacing:".06em"}}>{p.muscles.slice(0,3).join(" · ")}</div>
                     </div>
                     <div style={{width:30,height:30,borderRadius:"50%",background:"var(--sm-accent-soft)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--sm-accent)",fontSize:14,flexShrink:0}}>→</div>
@@ -973,18 +1005,21 @@ export default function App() {
 
                           {!s.isWarmup&&(
                             <div style={{display:"flex",alignItems:"center",gap:8,paddingLeft:24,marginTop:3,flexWrap:"wrap"}}>
-                              {lastSet?(
-                                <span style={{fontFamily:"var(--sm-font-mono)",fontSize:10,color:wentUp?"var(--sm-up)":wentDown?"#e05555":"var(--sm-sub)",letterSpacing:".04em"}}>
-                                  {wentUp?"↑ ":wentDown?"↓ ":""}{lastW>0?`${lastW}kg × ${lastR}`:"—"}
-                                  {sugg&&wi===0&&<span style={{color:sugg.type==="weight"?"var(--sm-accent)":sugg.type==="reps"?"#f59e0b":"var(--sm-sub)",marginLeft:8,fontWeight:600}}>
-                                    {sugg.type==="weight"?`→ ${sugg.weight}kg`:sugg.type==="reps"?`→ ${sugg.reps} reps`:`→ maintiens`}
-                                  </span>}
+                              {lastSet&&lastW>0&&(()=>{
+                                const dir=setDirection(lastR,ex.target?.reps);
+                                const col=dir==="up"?"var(--sm-up)":dir==="down"?"#e05555":"var(--sm-sub)";
+                                const icon=dir==="up"?"↑":dir==="down"?"↓":"→";
+                                return(
+                                  <span style={{fontFamily:"var(--sm-font-mono)",fontSize:10,color:col,letterSpacing:".04em"}}>
+                                    {icon} {lastW}kg × {lastR}
+                                  </span>
+                                );
+                              })()}
+                              {!lastSet&&sugg&&wi===0&&(
+                                <span style={{fontFamily:"var(--sm-font-mono)",fontSize:10,letterSpacing:".04em",fontWeight:600,color:sugg.direction==="up"?"var(--sm-up)":sugg.direction==="down"?"#e05555":"var(--sm-sub)"}}>
+                                  {sugg.direction==="up"?"↑ Augmenter":sugg.direction==="hold"?"→ Maintenir":"↓ Alléger"}
                                 </span>
-                              ):sugg&&wi===0?(
-                                <span style={{fontFamily:"var(--sm-font-mono)",fontSize:10,color:sugg.type==="weight"?"var(--sm-accent)":sugg.type==="reps"?"#f59e0b":"var(--sm-sub)",letterSpacing:".04em",fontWeight:600}}>
-                                  {sugg.type==="weight"?`↑ ${sugg.weight}kg × ${sugg.reps||"?"} reps`:sugg.type==="reps"?`↑ vise ${sugg.reps} reps`:`→ maintiens ${sugg.weight}kg`}
-                                </span>
-                              ):null}
+                              )}
                               <button onClick={()=>updateSet(ex.id,si,"note",s.note===undefined?"":s.note===""?" ":"")} style={{fontSize:9,background:"none",border:"1px solid var(--sm-line)",borderRadius:8,padding:"2px 8px",cursor:"pointer",color:s.note?.trim()?"var(--sm-accent)":"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".06em"}}>
                                 {s.note?.trim()?"note ✓":"+ note"}
                               </button>
