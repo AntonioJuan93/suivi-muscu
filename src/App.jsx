@@ -3,7 +3,7 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContai
 import { MUSCLE_GROUPS, INITIAL_PROGRAMS, T, makeStyles, formatDate, calcVolume, estimate1RM, startOfWeek } from "./theme";
 import { loadData, saveData } from "./storage";
 import { supabase } from "./supabase";
-import { loadCloud, saveCloud, clearCloudCache } from "./cloud";
+import { loadCloud, saveCloud, clearCloudCache, searchUserByEmail } from "./cloud";
 import Auth from "./Auth";
 
 const EQUIPMENT = [
@@ -45,6 +45,94 @@ function Ring({ value, max }) {
 
 function MonoLabel({ children }) {
   return <div style={{fontFamily:"var(--sm-font-mono)", fontSize:10, letterSpacing:".14em", color:"var(--sm-sub)", textTransform:"uppercase", marginBottom:4}}>{children}</div>;
+}
+
+function PartnerProfile({ data, email, S }) {
+  const sessions = data?.sessions || [];
+  const weekStart = startOfWeek(new Date());
+  const wVol = sets => calcVolume((sets||[]).filter(s=>!s.isWarmup));
+  const thisWeek = sessions.filter(s=>new Date(s.date)>=weekStart).length;
+  const thisWeekVol = Math.round(sessions.filter(s=>new Date(s.date)>=weekStart).reduce((a,s)=>a+s.exercises.reduce((b,e)=>b+wVol(e.sets),0),0));
+  const lastSession = sessions[0] || null;
+
+  const prMap = {};
+  sessions.forEach(s=>s.exercises.forEach(e=>{
+    const mw=Math.max(0,...(e.sets||[]).filter(st=>!st.isWarmup).map(st=>parseFloat(st.weight)||0));
+    const k=exKey(e.name,e.equipment||"");
+    if(mw>0&&mw>(prMap[k]?.weight||0)) prMap[k]={name:e.name,equipment:e.equipment||"",weight:mw};
+  }));
+  const topPRs=Object.values(prMap).sort((a,b)=>b.weight-a.weight).slice(0,5);
+
+  const weeklyTrend=Array.from({length:6},(_,i)=>{
+    const ws=new Date(weekStart);ws.setDate(ws.getDate()-(5-i)*7);
+    const we=new Date(ws);we.setDate(we.getDate()+7);
+    const filtered=sessions.filter(s=>{const d=new Date(s.date);return d>=ws&&d<we;});
+    return{label:ws.toLocaleDateString("fr-FR",{day:"2-digit",month:"short"}),vol:Math.round(filtered.reduce((a,s)=>a+s.exercises.reduce((b,e)=>b+wVol(e.sets),0),0)),count:filtered.length};
+  });
+
+  const displayName = email.split("@")[0];
+
+  return (
+    <div>
+      <div style={{...S.card,display:"flex",alignItems:"center",gap:20,marginBottom:14}}>
+        <div style={{position:"relative",flexShrink:0,width:108,height:108}}>
+          <Ring value={thisWeek} max={4}/>
+          <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+            <span style={{fontFamily:"var(--sm-font-disp)",fontSize:30,lineHeight:.9,color:"var(--sm-ink)"}}>{thisWeek}</span>
+            <span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,letterSpacing:".1em",color:"var(--sm-sub)",textTransform:"uppercase",marginTop:4}}>/ 4 sem.</span>
+          </div>
+        </div>
+        <div style={{flex:1}}>
+          <div style={{fontFamily:"var(--sm-font-disp)",fontSize:28,lineHeight:.92,color:"var(--sm-ink)",marginBottom:6}}>{displayName}</div>
+          <MonoLabel>Volume cette semaine</MonoLabel>
+          <Hero value={thisWeekVol>=1000?(thisWeekVol/1000).toFixed(1):thisWeekVol} unit={thisWeekVol>=1000?"t":"kg"} size={28}/>
+        </div>
+      </div>
+
+      {lastSession&&(
+        <div style={{...S.card,marginBottom:14}}>
+          <MonoLabel>Dernière séance</MonoLabel>
+          <div style={{fontFamily:"var(--sm-font-disp)",fontSize:22,lineHeight:.95,color:"var(--sm-ink)",marginBottom:4,marginTop:4}}>{lastSession.programName}</div>
+          <div style={{fontFamily:"var(--sm-font-mono)",fontSize:10,color:"var(--sm-sub)",letterSpacing:".06em",marginBottom:10}}>{formatDate(lastSession.date)}{lastSession.duration?` · ${lastSession.duration} min`:""}</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:5}}>{[...new Set(lastSession.exercises.map(e=>e.muscle))].filter(Boolean).map(m=><Tag key={m}>{m}</Tag>)}</div>
+        </div>
+      )}
+
+      {topPRs.length>0&&(
+        <div style={{...S.card,marginBottom:14}}>
+          <MonoLabel>Records personnels</MonoLabel>
+          <div style={{marginTop:6}}>
+            {topPRs.map(({name,equipment,weight},i)=>(
+              <div key={name+equipment} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:i<topPRs.length-1?"1px solid var(--sm-line)":"none"}}>
+                <div>
+                  <span style={{fontSize:13,fontWeight:600,color:"var(--sm-ink)"}}>{name}</span>
+                  {equipment&&<span style={{marginLeft:6,fontFamily:"var(--sm-font-mono)",fontSize:10,color:"var(--sm-sub)"}}>{equipLabel(equipment)}</span>}
+                </div>
+                <span style={{fontFamily:"var(--sm-font-disp)",fontSize:22,color:"var(--sm-accent)"}}>{weight}<span style={{fontFamily:"var(--sm-font-mono)",fontSize:10,color:"var(--sm-sub)",marginLeft:3}}>kg</span></span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {weeklyTrend.some(w=>w.vol>0)&&(
+        <div style={S.card}>
+          <MonoLabel>Volume — 6 dernières semaines</MonoLabel>
+          <div style={{width:"100%",height:120,marginTop:8}}>
+            <ResponsiveContainer><BarChart data={weeklyTrend} margin={{top:4,right:4,left:-30,bottom:0}}>
+              <XAxis dataKey="label" tick={{fontSize:9,fill:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)"}} stroke="var(--sm-line)"/>
+              <YAxis tick={{fontSize:9,fill:"var(--sm-sub)"}} stroke="var(--sm-line)"/>
+              <Tooltip contentStyle={{background:"var(--sm-card)",border:"1px solid var(--sm-line)",borderRadius:12,fontSize:11,color:"var(--sm-ink)"}}
+                formatter={(v,_,{payload})=>[`${(v/1000).toFixed(1)} t · ${payload.count} séance${payload.count>1?"s":""}`,""]}/>
+              <Bar dataKey="vol" radius={[4,4,0,0]} fill="var(--sm-accent)" opacity={0.85}/>
+            </BarChart></ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {sessions.length===0&&<p style={{color:"var(--sm-sub)",textAlign:"center",padding:"1rem 0",fontFamily:"var(--sm-font-serif)",fontStyle:"italic",fontSize:14}}>Aucune séance enregistrée.</p>}
+    </div>
+  );
 }
 
 function BottomNav({ tab, setTab }) {
@@ -202,6 +290,10 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [cloudLoaded, setCloudLoaded] = useState(false);
   const [authReady, setAuthReady] = useState(false);
+  const [partnerEmail, setPartnerEmail] = useState("");
+  const [partnerData, setPartnerData] = useState(null);
+  const [partnerLoading, setPartnerLoading] = useState(false);
+  const [partnerError, setPartnerError] = useState("");
 
   const S = useMemo(()=>makeStyles(),[]);
   const saveTimer = useRef(null);
@@ -270,8 +362,19 @@ export default function App() {
 
   // ── Persistence ───────────────────────────────────────────────────────────
   function fullData(){
-    return{sessions,programs,theme:darkMode?"dark":"",
+    return{sessions,programs,theme:darkMode?"dark":"",email:user?.email||"",
       draft:{exercises,sessionDate,sessionDuration,sessionNotes,sessionBodyweight,sessionRating,sessionSleep,sessionEnergy,mode,selectedProgram}};
+  }
+
+  async function searchPartner(){
+    const em=partnerEmail.trim().toLowerCase();
+    if(!em){setPartnerError("Saisis un email.");return;}
+    if(em===user?.email?.toLowerCase()){setPartnerError("C'est ton propre profil !");return;}
+    setPartnerLoading(true);setPartnerError("");setPartnerData(null);
+    const d=await searchUserByEmail(em);
+    setPartnerLoading(false);
+    if(!d){setPartnerError("Aucun utilisateur trouvé avec cet email.");return;}
+    setPartnerData(d);setTab("partner");
   }
   function applyData(d,withDraft){
     if(!d)return;
@@ -653,6 +756,27 @@ export default function App() {
             </div>
 
             <button onClick={()=>setTab("log")} style={{...S.btnP,width:"100%",padding:15,fontSize:15,letterSpacing:".03em"}}>+ Nouvelle séance libre</button>
+
+            <div style={{...S.card,marginTop:14}}>
+              <MonoLabel>Voir la progression d'un·e partenaire</MonoLabel>
+              <div style={{display:"flex",gap:8,marginTop:8}}>
+                <input type="email" placeholder="Email du partenaire" value={partnerEmail} onChange={e=>{setPartnerEmail(e.target.value);setPartnerError("");}}
+                  onKeyDown={e=>e.key==="Enter"&&searchPartner()}
+                  style={{...S.inp,flex:1}}/>
+                <button onClick={searchPartner} disabled={partnerLoading} style={{...S.btnP,flexShrink:0,padding:"10px 18px",opacity:partnerLoading?.6:1}}>
+                  {partnerLoading?"...":"Voir"}
+                </button>
+              </div>
+              {partnerError&&<div style={{marginTop:6,fontSize:12,color:"#e05555",fontFamily:"var(--sm-font-mono)"}}>{partnerError}</div>}
+            </div>
+          </div>
+        )}
+
+        {/* ══ PARTENAIRE ════════════════════════════════════════════════════ */}
+        {tab==="partner"&&partnerData&&(
+          <div>
+            <button onClick={()=>setTab("home")} style={{...S.btnS,marginBottom:16,display:"flex",alignItems:"center",gap:6}}>← Retour</button>
+            <PartnerProfile data={partnerData} email={partnerEmail} S={S}/>
           </div>
         )}
 
@@ -721,8 +845,8 @@ export default function App() {
                     </div>
                   )}
 
-                  <div style={{display:"grid",gridTemplateColumns:"18px 22px 1fr 1fr 46px 50px 24px",gap:5,alignItems:"center",marginBottom:4}}>
-                    {["#","W","kg","Reps","RPE","1RM",""].map((h,i)=><span key={i} style={{fontSize:9,color:"var(--sm-sub)",textAlign:"center",fontFamily:"var(--sm-font-mono)",letterSpacing:".08em",textTransform:"uppercase"}}>{h}</span>)}
+                  <div style={{display:"grid",gridTemplateColumns:"18px 22px 1fr 1fr 24px",gap:5,alignItems:"center",marginBottom:4}}>
+                    {["#","W","kg","Reps",""].map((h,i)=><span key={i} style={{fontSize:9,color:"var(--sm-sub)",textAlign:"center",fontFamily:"var(--sm-font-mono)",letterSpacing:".08em",textTransform:"uppercase"}}>{h}</span>)}
                   </div>
 
                   {ex.sets.map((s,si)=>{
@@ -731,13 +855,11 @@ export default function App() {
                     const liveRestStr=isTimerActive?formatRest(liveNow-activeRest.startTime)||"0s":null;
                     return(
                       <div key={si}>
-                        <div style={{display:"grid",gridTemplateColumns:"18px 22px 1fr 1fr 46px 50px 24px",gap:5,alignItems:"center",marginBottom:1,opacity:s.isWarmup?0.6:1}}>
+                        <div style={{display:"grid",gridTemplateColumns:"18px 22px 1fr 1fr 24px",gap:5,alignItems:"center",marginBottom:1,opacity:s.isWarmup?0.6:1}}>
                           <span style={{fontSize:11,color:"var(--sm-sub)",textAlign:"center",fontFamily:"var(--sm-font-mono)"}}>{si+1}</span>
                           <button onClick={()=>updateSet(ex.id,si,"isWarmup",!s.isWarmup)} style={{fontSize:9,fontWeight:700,border:`1px solid ${s.isWarmup?"var(--sm-accent)":"var(--sm-line)"}`,borderRadius:6,padding:"2px 0",cursor:"pointer",background:s.isWarmup?"var(--sm-accent-soft)":"transparent",color:s.isWarmup?"var(--sm-accent)":"var(--sm-sub)",lineHeight:1,width:"100%",fontFamily:"var(--sm-font-mono)"}}>W</button>
                           <input type="number" placeholder="0" value={s.weight} onChange={e=>updateSet(ex.id,si,"weight",e.target.value)} style={{...S.inp,textAlign:"center",padding:"8px 4px",fontFamily:"var(--sm-font-mono)"}}/>
                           <input type="number" placeholder="0" value={s.reps} onChange={e=>updateSet(ex.id,si,"reps",e.target.value)} style={{...S.inp,textAlign:"center",padding:"8px 4px",fontFamily:"var(--sm-font-mono)"}}/>
-                          <input type="number" placeholder="—" min="1" max="10" step="0.5" value={s.rpe||""} onChange={e=>updateSet(ex.id,si,"rpe",e.target.value)} style={{...S.inp,textAlign:"center",padding:"8px 4px",fontSize:12,fontFamily:"var(--sm-font-mono)"}}/>
-                          <span style={{fontSize:11,color:"var(--sm-sub)",textAlign:"right",fontFamily:"var(--sm-font-mono)"}}>{estimate1RM(s.weight,s.reps)||"—"}</span>
                           <button onClick={()=>removeSet(ex.id,si)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--sm-sub)",fontSize:13}}>✕</button>
                         </div>
                         {s.restMs&&s.restMs>0?(
@@ -874,9 +996,6 @@ export default function App() {
                     {s.exercises.map((e,i)=>{
                       const working=(e.sets||[]).filter(st=>!st.isWarmup&&(st.weight||st.reps));
                       const warmupSets=(e.sets||[]).filter(st=>st.isWarmup&&(st.weight||st.reps));
-                      const withRPE=working.filter(st=>st.rpe);
-                      const avgRPE=withRPE.length?(withRPE.reduce((a,st)=>a+(parseFloat(st.rpe)||0),0)/withRPE.length).toFixed(1):null;
-                      const bestORM=Math.max(0,...working.map(st=>estimate1RM(st.weight,st.reps)));
                       const restTimes=working.filter(st=>st.restMs&&st.restMs>5000).map(st=>formatRest(st.restMs)).filter(Boolean);
                       const isPR=prSet.has(s.id+":"+exKey(e.name,e.equipment||""));
                       return(
@@ -892,17 +1011,12 @@ export default function App() {
                               {working.map((st,j)=>(
                                 <span key={j} style={{display:"inline-block",marginRight:7,whiteSpace:"nowrap",background:"var(--sm-card2)",borderRadius:8,padding:"2px 8px",border:"1px solid var(--sm-line)"}}>
                                   <strong>{st.weight||"—"}</strong>×<strong>{st.reps||"—"}</strong>
-                                  {st.rpe&&<span style={{color:"var(--sm-sub)",fontSize:10}}> @{st.rpe}</span>}
                                 </span>
                               ))}
                             </div>
                           )}
                           {warmupSets.length>0&&<div style={{fontSize:11,color:"var(--sm-sub)",marginBottom:4,fontFamily:"var(--sm-font-mono)"}}>W: {warmupSets.map(st=>`${st.weight||"—"}×${st.reps||"—"}`).join(" · ")}</div>}
-                          <div style={{display:"flex",gap:10,flexWrap:"wrap",fontFamily:"var(--sm-font-mono)",fontSize:11,color:"var(--sm-sub)",letterSpacing:".04em"}}>
-                            {avgRPE&&<span>RPE <strong style={{color:"var(--sm-ink)"}}>{avgRPE}</strong></span>}
-                            {bestORM>0&&<span>1RM <strong style={{color:"var(--sm-accent)"}}>{bestORM}kg</strong></span>}
-                            {restTimes.length>0&&<span>Repos {restTimes.join(" · ")}</span>}
-                          </div>
+                          {restTimes.length>0&&<div style={{fontFamily:"var(--sm-font-mono)",fontSize:11,color:"var(--sm-sub)",letterSpacing:".04em"}}>Repos {restTimes.join(" · ")}</div>}
                           {e.notes&&<div style={{fontSize:11,color:"var(--sm-sub)",marginTop:4,fontFamily:"var(--sm-font-serif)",fontStyle:"italic"}}>{e.notes}</div>}
                         </div>
                       );

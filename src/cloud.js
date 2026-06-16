@@ -8,12 +8,25 @@ export function clearCloudCache() {
 }
 
 export async function loadCloud() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
   const { data, error } = await supabase
     .from("tracker")
     .select("id, data")
+    .eq("user_id", user.id)
     .maybeSingle();
   if (error || !data) return null;
   rowId = data.id;
+  return data.data;
+}
+
+export async function searchUserByEmail(email) {
+  const { data, error } = await supabase
+    .from("tracker")
+    .select("data")
+    .filter("data->>email", "eq", email.toLowerCase().trim())
+    .maybeSingle();
+  if (error || !data) return null;
   return data.data;
 }
 
