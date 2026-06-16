@@ -557,7 +557,7 @@ export default function App() {
       const sugg=getSuggestion(name,equipment,targetReps);
       const defaultWeight=sugg?String(sugg.weight):"";
       const defaultReps=targetReps?targetReps.split("-")[0]:"";
-      const sets=Array.from({length:targetSets},()=>({weight:defaultWeight,reps:defaultReps,rpe:"",isWarmup:false,restMs:null}));
+      const sets=Array.from({length:targetSets},()=>({weight:defaultWeight,reps:defaultReps,rpe:"",isWarmup:false,restMs:null,note:""}));
       return{id:now+i,name,muscle,equipment,notes:"",sets,target:{sets:targetSets,reps:targetReps}};
     }));
   }
@@ -568,7 +568,7 @@ export default function App() {
     setSessionDuration(s.duration?String(s.duration):"");setSessionNotes("");
     setSessionBodyweight("");setSessionRating(null);setSessionSleep(null);setSessionEnergy(null);
     const now=Date.now();
-    setExercises(s.exercises.map((e,i)=>({id:now+i,name:e.name,muscle:e.muscle,equipment:e.equipment||"",notes:"",sets:(e.sets||[]).map(st=>({weight:st.weight,reps:st.reps,rpe:"",isWarmup:st.isWarmup||false,restMs:null}))})));
+    setExercises(s.exercises.map((e,i)=>({id:now+i,name:e.name,muscle:e.muscle,equipment:e.equipment||"",notes:"",sets:(e.sets||[]).map(st=>({weight:st.weight,reps:st.reps,rpe:"",isWarmup:st.isWarmup||false,restMs:null,note:""}))})));
     setTab("log");
   }
 
@@ -578,7 +578,7 @@ export default function App() {
       if(e.id!==id)return e;
       let sets=e.sets;
       if(activeRest&&activeRest.exId===id){const elapsed=now-activeRest.startTime;sets=sets.map((st,i)=>i===activeRest.si?{...st,restMs:elapsed}:st);}
-      return{...e,sets:[...sets,{weight:"",reps:"",rpe:"",isWarmup:false,restMs:null}]};
+      return{...e,sets:[...sets,{weight:"",reps:"",rpe:"",isWarmup:false,restMs:null,note:""}]};
     }));
     if(activeRest&&activeRest.exId===id)setActiveRest(null);
   }
@@ -600,7 +600,7 @@ export default function App() {
     let muscle=newExMuscle;
     for(const s of sessions){const f=s.exercises.find(e=>e.name===name&&(e.equipment||"")===(equipment||""));if(f){muscle=f.muscle;break;}}
     if(muscle===newExMuscle){for(const s of sessions){const f=s.exercises.find(e=>e.name===name);if(f){muscle=f.muscle;break;}}}
-    setExercises(ex=>[...ex,{id:Date.now(),name,muscle,equipment,notes:"",sets:[{weight:"",reps:"",rpe:"",isWarmup:false,restMs:null}]}]);
+    setExercises(ex=>[...ex,{id:Date.now(),name,muscle,equipment,notes:"",sets:[{weight:"",reps:"",rpe:"",isWarmup:false,restMs:null,note:""}]}]);
     setNewExName("");if(equipOverride===undefined)setNewExEquipment("");
   }
 
@@ -939,19 +939,8 @@ export default function App() {
                   </div>
 
                   {last&&(
-                    <div style={{fontSize:11,marginBottom:10,padding:"8px 12px",background:"var(--sm-card2)",borderRadius:12,color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".04em"}}>
-                      {last.daysAgo===0?"Aujourd'hui":last.daysAgo===1?"Hier":`Il y a ${last.daysAgo}j`} · {last.sets.length} série{last.sets.length>1?"s":""} @ <strong style={{color:"var(--sm-ink)"}}>{last.maxWeight}kg</strong>
-                      {last.repsPerSet.length>0&&` — ${last.repsPerSet.join(", ")} reps`}
-                    </div>
-                  )}
-
-                  {sugg&&(
-                    <div style={{marginBottom:12,padding:"11px 14px",borderRadius:14,background:sugg.type==="weight"?"var(--sm-accent-soft)":sugg.type==="reps"?"rgba(245,158,11,.12)":"var(--sm-card2)",border:`1.5px solid ${sugg.type==="weight"?"var(--sm-accent)":sugg.type==="reps"?"#f59e0b":"var(--sm-line)"}`}}>
-                      {sugg.type==="weight"&&<div style={{fontWeight:700,fontSize:13,color:"var(--sm-accent)"}}>↑ Augmente le poids → {sugg.weight} kg{sugg.reps?` × ${sugg.reps} reps`:""}</div>}
-                      {sugg.type==="reps"&&<div style={{fontWeight:700,fontSize:13,color:"#f59e0b"}}>↑ Augmente les reps → {sugg.reps} reps @ {sugg.weight} kg</div>}
-                      {sugg.type==="hold"&&<div style={{fontWeight:700,fontSize:13,color:"var(--sm-sub)"}}>→ Maintiens {sugg.weight} kg</div>}
-                      <div style={{fontSize:11,color:"var(--sm-sub)",marginTop:3,fontFamily:"var(--sm-font-mono)",letterSpacing:".04em"}}>{sugg.reason}</div>
-                      {sugg.wellnessNote&&<div style={{fontSize:11,color:"#e05555",marginTop:2}}>{sugg.wellnessNote}</div>}
+                    <div style={{fontSize:10,marginBottom:8,color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".04em"}}>
+                      {last.daysAgo===0?"Aujourd'hui":last.daysAgo===1?"Hier":`Il y a ${last.daysAgo}j`}
                     </div>
                   )}
 
@@ -959,37 +948,74 @@ export default function App() {
                     {["#","W","kg","Reps",""].map((h,i)=><span key={i} style={{fontSize:9,color:"var(--sm-sub)",textAlign:"center",fontFamily:"var(--sm-font-mono)",letterSpacing:".08em",textTransform:"uppercase"}}>{h}</span>)}
                   </div>
 
-                  {ex.sets.map((s,si)=>{
-                    const isLast=si===ex.sets.length-1;
-                    const isTimerActive=activeRest?.exId===ex.id&&activeRest?.si===si;
-                    const liveRestStr=isTimerActive?formatRest(liveNow-activeRest.startTime)||"0s":null;
-                    return(
-                      <div key={si}>
-                        <div style={{display:"grid",gridTemplateColumns:"18px 22px 1fr 1fr 24px",gap:5,alignItems:"center",marginBottom:1,opacity:s.isWarmup?0.6:1}}>
-                          <span style={{fontSize:11,color:"var(--sm-sub)",textAlign:"center",fontFamily:"var(--sm-font-mono)"}}>{si+1}</span>
-                          <button onClick={()=>updateSet(ex.id,si,"isWarmup",!s.isWarmup)} style={{fontSize:9,fontWeight:700,border:`1px solid ${s.isWarmup?"var(--sm-accent)":"var(--sm-line)"}`,borderRadius:6,padding:"2px 0",cursor:"pointer",background:s.isWarmup?"var(--sm-accent-soft)":"transparent",color:s.isWarmup?"var(--sm-accent)":"var(--sm-sub)",lineHeight:1,width:"100%",fontFamily:"var(--sm-font-mono)"}}>W</button>
-                          <input type="number" placeholder="0" value={s.weight} onChange={e=>updateSet(ex.id,si,"weight",e.target.value)} style={{...S.inp,textAlign:"center",padding:"8px 4px",fontFamily:"var(--sm-font-mono)"}}/>
-                          <input type="number" placeholder="0" value={s.reps} onChange={e=>updateSet(ex.id,si,"reps",e.target.value)} style={{...S.inp,textAlign:"center",padding:"8px 4px",fontFamily:"var(--sm-font-mono)"}}/>
-                          <button onClick={()=>removeSet(ex.id,si)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--sm-sub)",fontSize:13}}>✕</button>
+                  {(()=>{
+                    let workingIdx=-1;
+                    return ex.sets.map((s,si)=>{
+                      if(!s.isWarmup) workingIdx++;
+                      const wi=workingIdx;
+                      const lastSet=(!s.isWarmup&&last)?last.sets[wi]:null;
+                      const isLast=si===ex.sets.length-1;
+                      const isTimerActive=activeRest?.exId===ex.id&&activeRest?.si===si;
+                      const liveRestStr=isTimerActive?formatRest(liveNow-activeRest.startTime)||"0s":null;
+                      const curW=parseFloat(s.weight)||0, curR=parseInt(s.reps)||0;
+                      const lastW=parseFloat(lastSet?.weight)||0, lastR=parseInt(lastSet?.reps)||0;
+                      const wentUp=curW>0&&lastW>0&&curW>lastW;
+                      const wentDown=curW>0&&lastW>0&&curW<lastW;
+                      return(
+                        <div key={si} style={{marginBottom:6}}>
+                          <div style={{display:"grid",gridTemplateColumns:"18px 22px 1fr 1fr 24px",gap:5,alignItems:"center",opacity:s.isWarmup?0.6:1}}>
+                            <span style={{fontSize:11,color:"var(--sm-sub)",textAlign:"center",fontFamily:"var(--sm-font-mono)"}}>{si+1}</span>
+                            <button onClick={()=>updateSet(ex.id,si,"isWarmup",!s.isWarmup)} style={{fontSize:9,fontWeight:700,border:`1px solid ${s.isWarmup?"var(--sm-accent)":"var(--sm-line)"}`,borderRadius:6,padding:"2px 0",cursor:"pointer",background:s.isWarmup?"var(--sm-accent-soft)":"transparent",color:s.isWarmup?"var(--sm-accent)":"var(--sm-sub)",lineHeight:1,width:"100%",fontFamily:"var(--sm-font-mono)"}}>W</button>
+                            <input type="number" placeholder="0" value={s.weight} onChange={e=>updateSet(ex.id,si,"weight",e.target.value)} style={{...S.inp,textAlign:"center",padding:"8px 4px",fontFamily:"var(--sm-font-mono)",borderColor:wentUp?"var(--sm-up)":wentDown?"#e05555":"var(--sm-line)"}}/>
+                            <input type="number" placeholder="0" value={s.reps} onChange={e=>updateSet(ex.id,si,"reps",e.target.value)} style={{...S.inp,textAlign:"center",padding:"8px 4px",fontFamily:"var(--sm-font-mono)"}}/>
+                            <button onClick={()=>removeSet(ex.id,si)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--sm-sub)",fontSize:13}}>✕</button>
+                          </div>
+
+                          {!s.isWarmup&&(
+                            <div style={{display:"flex",alignItems:"center",gap:8,paddingLeft:24,marginTop:3,flexWrap:"wrap"}}>
+                              {lastSet?(
+                                <span style={{fontFamily:"var(--sm-font-mono)",fontSize:10,color:wentUp?"var(--sm-up)":wentDown?"#e05555":"var(--sm-sub)",letterSpacing:".04em"}}>
+                                  {wentUp?"↑ ":wentDown?"↓ ":""}{lastW>0?`${lastW}kg × ${lastR}`:"—"}
+                                  {sugg&&wi===0&&<span style={{color:sugg.type==="weight"?"var(--sm-accent)":sugg.type==="reps"?"#f59e0b":"var(--sm-sub)",marginLeft:8,fontWeight:600}}>
+                                    {sugg.type==="weight"?`→ ${sugg.weight}kg`:sugg.type==="reps"?`→ ${sugg.reps} reps`:`→ maintiens`}
+                                  </span>}
+                                </span>
+                              ):sugg&&wi===0?(
+                                <span style={{fontFamily:"var(--sm-font-mono)",fontSize:10,color:sugg.type==="weight"?"var(--sm-accent)":sugg.type==="reps"?"#f59e0b":"var(--sm-sub)",letterSpacing:".04em",fontWeight:600}}>
+                                  {sugg.type==="weight"?`↑ ${sugg.weight}kg × ${sugg.reps||"?"} reps`:sugg.type==="reps"?`↑ vise ${sugg.reps} reps`:`→ maintiens ${sugg.weight}kg`}
+                                </span>
+                              ):null}
+                              <button onClick={()=>updateSet(ex.id,si,"note",s.note===undefined?"":s.note===""?" ":"")} style={{fontSize:9,background:"none",border:"1px solid var(--sm-line)",borderRadius:8,padding:"2px 8px",cursor:"pointer",color:s.note?.trim()?"var(--sm-accent)":"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".06em"}}>
+                                {s.note?.trim()?"note ✓":"+ note"}
+                              </button>
+                            </div>
+                          )}
+
+                          {!s.isWarmup&&(s.note?.trim()||s.note===" ")&&(
+                            <div style={{paddingLeft:24,marginTop:4}}>
+                              <input value={s.note?.trim()?s.note:""} onChange={e=>updateSet(ex.id,si,"note",e.target.value)} placeholder="Note sur cette série…" style={{...S.inp,fontSize:11,padding:"6px 10px",width:"100%"}}/>
+                            </div>
+                          )}
+
+                          {s.restMs&&s.restMs>0?(
+                            <div style={{fontSize:10,color:"var(--sm-sub)",paddingLeft:24,marginTop:3,display:"flex",alignItems:"center",gap:6,fontFamily:"var(--sm-font-mono)",letterSpacing:".06em"}}>
+                              Repos : <strong style={{color:"var(--sm-ink)"}}>{formatRest(s.restMs)}</strong>
+                              <button onClick={()=>updateSet(ex.id,si,"restMs",null)} style={{fontSize:9,color:"var(--sm-sub)",background:"none",border:"none",cursor:"pointer",opacity:0.5,padding:0}}>↺</button>
+                            </div>
+                          ):isTimerActive?(
+                            <div style={{display:"flex",alignItems:"center",gap:8,paddingLeft:24,marginTop:3}}>
+                              <span style={{fontSize:15,fontWeight:700,color:"var(--sm-accent)",fontFamily:"var(--sm-font-mono)",letterSpacing:".06em"}}>{liveRestStr}</span>
+                              <button onClick={stopRest} style={{fontSize:11,color:"var(--sm-accent-ink)",background:"var(--sm-accent)",border:"none",borderRadius:10,padding:"4px 12px",cursor:"pointer",fontWeight:600}}>Arrêter</button>
+                            </div>
+                          ):isLast&&!activeRest?(
+                            <div style={{paddingLeft:24,marginTop:3}}>
+                              <button onClick={()=>startRest(ex.id,si)} style={{fontSize:11,color:"var(--sm-sub)",border:"1px solid var(--sm-line)",borderRadius:10,padding:"4px 12px",background:"transparent",cursor:"pointer",fontFamily:"var(--sm-font-mono)",letterSpacing:".04em"}}>Démarrer le repos</button>
+                            </div>
+                          ):null}
                         </div>
-                        {s.restMs&&s.restMs>0?(
-                          <div style={{fontSize:10,color:"var(--sm-sub)",paddingLeft:20,paddingBottom:5,display:"flex",alignItems:"center",gap:6,fontFamily:"var(--sm-font-mono)",letterSpacing:".06em"}}>
-                            Repos S{si+1} : <strong style={{color:"var(--sm-ink)"}}>{formatRest(s.restMs)}</strong>
-                            <button onClick={()=>updateSet(ex.id,si,"restMs",null)} style={{fontSize:9,color:"var(--sm-sub)",background:"none",border:"none",cursor:"pointer",opacity:0.5,padding:0}}>↺</button>
-                          </div>
-                        ):isTimerActive?(
-                          <div style={{display:"flex",alignItems:"center",gap:8,paddingLeft:20,paddingBottom:6}}>
-                            <span style={{fontSize:15,fontWeight:700,color:"var(--sm-accent)",fontFamily:"var(--sm-font-mono)",letterSpacing:".06em"}}>{liveRestStr}</span>
-                            <button onClick={stopRest} style={{fontSize:11,color:"var(--sm-accent-ink)",background:"var(--sm-accent)",border:"none",borderRadius:10,padding:"4px 12px",cursor:"pointer",fontWeight:600}}>Arrêter</button>
-                          </div>
-                        ):isLast&&!activeRest?(
-                          <div style={{paddingLeft:20,paddingBottom:5}}>
-                            <button onClick={()=>startRest(ex.id,si)} style={{fontSize:11,color:"var(--sm-sub)",border:"1px solid var(--sm-line)",borderRadius:10,padding:"4px 12px",background:"transparent",cursor:"pointer",fontFamily:"var(--sm-font-mono)",letterSpacing:".04em"}}>Démarrer le repos</button>
-                          </div>
-                        ):null}
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
 
                   <button onClick={()=>addSet(ex.id)} style={{...S.btnS,marginTop:8,fontSize:11}}>+ Série</button>
                   <input value={ex.notes||""} onChange={e=>updateExNotes(ex.id,e.target.value)} placeholder="Note technique…" style={{...S.inp,marginTop:8,fontSize:12,padding:"8px 12px"}}/>
