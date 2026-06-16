@@ -25,6 +25,42 @@ export async function saveCloud(appData) {
     );
 }
 
+export async function createBackup(appData) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("backups").insert({ user_id: user.id, data: appData });
+  // Keep only last 8 backups
+  const { data: all } = await supabase
+    .from("backups")
+    .select("id, created_at")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+  if (all && all.length > 8) {
+    const toDelete = all.slice(8).map(b => b.id);
+    await supabase.from("backups").delete().in("id", toDelete);
+  }
+}
+
+export async function listBackups() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data } = await supabase
+    .from("backups")
+    .select("id, created_at")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+  return data || [];
+}
+
+export async function restoreBackup(id) {
+  const { data } = await supabase
+    .from("backups")
+    .select("data")
+    .eq("id", id)
+    .single();
+  return data?.data || null;
+}
+
 export async function searchUserByEmail(email) {
   const { data, error } = await supabase
     .from("tracker")
