@@ -51,19 +51,58 @@ function PartnerProfile({ data, email, S }) {
   const sessions = data?.sessions || [];
   const weekStart = startOfWeek(new Date());
   const wVol = sets => calcVolume((sets||[]).filter(s=>!s.isWarmup));
+
+  // ── Assiduité ────────────────────────────────────────────────────────────────
   const thisWeek = sessions.filter(s=>new Date(s.date)>=weekStart).length;
   const thisWeekVol = Math.round(sessions.filter(s=>new Date(s.date)>=weekStart).reduce((a,s)=>a+s.exercises.reduce((b,e)=>b+wVol(e.sets),0),0));
   const lastSession = sessions[0] || null;
 
-  const prMap = {};
-  sessions.forEach(s=>s.exercises.forEach(e=>{
-    const mw=Math.max(0,...(e.sets||[]).filter(st=>!st.isWarmup).map(st=>parseFloat(st.weight)||0));
-    const k=exKey(e.name,e.equipment||"");
-    if(mw>0&&mw>(prMap[k]?.weight||0)) prMap[k]={name:e.name,equipment:e.equipment||"",weight:mw};
-  }));
-  const topPRs=Object.values(prMap).sort((a,b)=>b.weight-a.weight).slice(0,5);
+  // Séances sur 4 semaines vs 4 semaines précédentes
+  const fourWeeksAgo = new Date(weekStart); fourWeeksAgo.setDate(fourWeeksAgo.getDate()-28);
+  const eightWeeksAgo = new Date(weekStart); eightWeeksAgo.setDate(eightWeeksAgo.getDate()-56);
+  const recentCount = sessions.filter(s=>new Date(s.date)>=fourWeeksAgo).length;
+  const prevCount   = sessions.filter(s=>{ const d=new Date(s.date); return d>=eightWeeksAgo&&d<fourWeeksAgo; }).length;
+  const attendanceTrend = recentCount>prevCount?"up":recentCount<prevCount?"down":"stable";
 
-  const weeklyTrend=Array.from({length:6},(_,i)=>{
+  // ── Progression par exercice (top 5 les plus pratiqués) ─────────────────────
+  const exFreq = {};
+  sessions.forEach(s=>s.exercises.forEach(e=>{
+    const k=exKey(e.name,e.equipment||"");
+    exFreq[k]=(exFreq[k]||0)+1;
+  }));
+  const topExKeys = Object.entries(exFreq).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k])=>k);
+
+  const exProgression = topExKeys.map(k=>{
+    const [name,equip=""]=k.split(":::");
+    // dernières 4 séances contenant cet exercice
+    const history = sessions
+      .filter(s=>s.exercises.some(e=>e.name===name&&(e.equipment||"")===(equip)))
+      .slice(0,4)
+      .reverse()
+      .map(s=>{
+        const e=s.exercises.find(x=>x.name===name&&(x.equipment||"")===(equip));
+        const working=(e.sets||[]).filter(st=>!st.isWarmup&&(st.weight||st.reps));
+        const bestVol = working.reduce((mx,st)=>{const v=(parseFloat(st.weight)||0)*(parseInt(st.reps)||0);return v>mx?v:mx;},0);
+        const bestW = Math.max(0,...working.map(st=>parseFloat(st.weight)||0));
+        const totalVol = Math.round(working.reduce((a,st)=>a+(parseFloat(st.weight)||0)*(parseInt(st.reps)||0),0));
+        return { date:s.date, bestWeight:bestW, bestSetVol:bestVol, totalVol, sets:working.length };
+      });
+    if(history.length<2) return null;
+    const last=history[history.length-1], prev=history[history.length-2];
+    const trend = last.totalVol>prev.totalVol*1.02?"up":last.totalVol<prev.totalVol*0.98?"down":"stable";
+    return { name, equip, history, trend };
+  }).filter(Boolean);
+
+  // ── Équilibre musculaire (4 dernières semaines) ──────────────────────────────
+  const muscleFreq = {};
+  sessions.filter(s=>new Date(s.date)>=fourWeeksAgo).forEach(s=>
+    s.exercises.forEach(e=>{ if(e.muscle){ muscleFreq[e.muscle]=(muscleFreq[e.muscle]||0)+1; } })
+  );
+  const muscleData = Object.entries(muscleFreq).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([m,n])=>({m,n}));
+  const maxMuscle = muscleData[0]?.n||1;
+
+  // ── Volume hebdo ─────────────────────────────────────────────────────────────
+  const weeklyTrend = Array.from({length:6},(_,i)=>{
     const ws=new Date(weekStart);ws.setDate(ws.getDate()-(5-i)*7);
     const we=new Date(ws);we.setDate(we.getDate()+7);
     const filtered=sessions.filter(s=>{const d=new Date(s.date);return d>=ws&&d<we;});
@@ -71,9 +110,12 @@ function PartnerProfile({ data, email, S }) {
   });
 
   const displayName = email.split("@")[0];
+  const trendColor = t => t==="up"?"var(--sm-up)":t==="down"?"#e05555":"var(--sm-sub)";
+  const trendIcon  = t => t==="up"?"↑":t==="down"?"↓":"→";
 
   return (
     <div>
+      {/* ── Header assiduité ── */}
       <div style={{...S.card,display:"flex",alignItems:"center",gap:20,marginBottom:14}}>
         <div style={{position:"relative",flexShrink:0,width:108,height:108}}>
           <Ring value={thisWeek} max={4}/>
@@ -83,38 +125,82 @@ function PartnerProfile({ data, email, S }) {
           </div>
         </div>
         <div style={{flex:1}}>
-          <div style={{fontFamily:"var(--sm-font-disp)",fontSize:28,lineHeight:.92,color:"var(--sm-ink)",marginBottom:6}}>{displayName}</div>
+          <div style={{fontFamily:"var(--sm-font-disp)",fontSize:28,lineHeight:.92,color:"var(--sm-ink)",marginBottom:4}}>{displayName}</div>
+          <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:6}}>
+            <span style={{fontFamily:"var(--sm-font-mono)",fontSize:10,color:trendColor(attendanceTrend),letterSpacing:".08em"}}>
+              {trendIcon(attendanceTrend)} {recentCount} séances / 4 sem.
+            </span>
+          </div>
           <MonoLabel>Volume cette semaine</MonoLabel>
           <Hero value={thisWeekVol>=1000?(thisWeekVol/1000).toFixed(1):thisWeekVol} unit={thisWeekVol>=1000?"t":"kg"} size={28}/>
         </div>
       </div>
 
+      {/* ── Dernière séance ── */}
       {lastSession&&(
         <div style={{...S.card,marginBottom:14}}>
           <MonoLabel>Dernière séance</MonoLabel>
           <div style={{fontFamily:"var(--sm-font-disp)",fontSize:22,lineHeight:.95,color:"var(--sm-ink)",marginBottom:4,marginTop:4}}>{lastSession.programName}</div>
-          <div style={{fontFamily:"var(--sm-font-mono)",fontSize:10,color:"var(--sm-sub)",letterSpacing:".06em",marginBottom:10}}>{formatDate(lastSession.date)}{lastSession.duration?` · ${lastSession.duration} min`:""}</div>
+          <div style={{fontFamily:"var(--sm-font-mono)",fontSize:10,color:"var(--sm-sub)",letterSpacing:".06em",marginBottom:10}}>
+            {formatDate(lastSession.date)}{lastSession.duration?` · ${lastSession.duration} min`:""}
+            {" · "}{lastSession.exercises.length} exercice{lastSession.exercises.length>1?"s":""}
+            {" · "}{lastSession.exercises.reduce((a,e)=>(e.sets||[]).filter(s=>!s.isWarmup&&(s.weight||s.reps)).length+a,0)} séries
+          </div>
           <div style={{display:"flex",flexWrap:"wrap",gap:5}}>{[...new Set(lastSession.exercises.map(e=>e.muscle))].filter(Boolean).map(m=><Tag key={m}>{m}</Tag>)}</div>
         </div>
       )}
 
-      {topPRs.length>0&&(
+      {/* ── Progression des exercices ── */}
+      {exProgression.length>0&&(
         <div style={{...S.card,marginBottom:14}}>
-          <MonoLabel>Records personnels</MonoLabel>
-          <div style={{marginTop:6}}>
-            {topPRs.map(({name,equipment,weight},i)=>(
-              <div key={name+equipment} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:i<topPRs.length-1?"1px solid var(--sm-line)":"none"}}>
-                <div>
-                  <span style={{fontSize:13,fontWeight:600,color:"var(--sm-ink)"}}>{name}</span>
-                  {equipment&&<span style={{marginLeft:6,fontFamily:"var(--sm-font-mono)",fontSize:10,color:"var(--sm-sub)"}}>{equipLabel(equipment)}</span>}
+          <MonoLabel>Surcharge progressive</MonoLabel>
+          <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:12}}>
+            {exProgression.map(({name,equip,history,trend})=>(
+              <div key={name+equip}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                  <div>
+                    <span style={{fontSize:13,fontWeight:600,color:"var(--sm-ink)"}}>{name}</span>
+                    {equip&&<span style={{marginLeft:6,fontFamily:"var(--sm-font-mono)",fontSize:10,color:"var(--sm-sub)"}}>{equipLabel(equip)}</span>}
+                  </div>
+                  <span style={{fontFamily:"var(--sm-font-mono)",fontSize:13,fontWeight:700,color:trendColor(trend)}}>{trendIcon(trend)}</span>
                 </div>
-                <span style={{fontFamily:"var(--sm-font-disp)",fontSize:22,color:"var(--sm-accent)"}}>{weight}<span style={{fontFamily:"var(--sm-font-mono)",fontSize:10,color:"var(--sm-sub)",marginLeft:3}}>kg</span></span>
+                <div style={{display:"flex",gap:5}}>
+                  {history.map((h,i)=>{
+                    const isLast=i===history.length-1;
+                    return(
+                      <div key={i} style={{flex:1,background:isLast?"var(--sm-accent-soft)":"var(--sm-card2)",borderRadius:10,padding:"7px 6px",border:`1px solid ${isLast?"var(--sm-accent)":"var(--sm-line)"}`,textAlign:"center"}}>
+                        <div style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",letterSpacing:".06em",marginBottom:3}}>{formatDate(h.date)}</div>
+                        <div style={{fontFamily:"var(--sm-font-disp)",fontSize:16,color:isLast?"var(--sm-accent)":"var(--sm-ink)",lineHeight:1}}>{h.bestWeight||"—"}<span style={{fontSize:9,color:"var(--sm-sub)",marginLeft:2}}>kg</span></div>
+                        <div style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",marginTop:2}}>{h.sets} sér.</div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             ))}
           </div>
         </div>
       )}
 
+      {/* ── Équilibre musculaire ── */}
+      {muscleData.length>0&&(
+        <div style={{...S.card,marginBottom:14}}>
+          <MonoLabel>Groupes musculaires — 4 dernières semaines</MonoLabel>
+          <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:7}}>
+            {muscleData.map(({m,n})=>(
+              <div key={m} style={{display:"flex",alignItems:"center",gap:10}}>
+                <span style={{fontSize:11,color:"var(--sm-ink)",width:140,flexShrink:0,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{m}</span>
+                <div style={{flex:1,height:8,background:"var(--sm-card2)",borderRadius:4,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${(n/maxMuscle)*100}%`,background:"var(--sm-accent)",borderRadius:4,transition:"width .6s ease"}}/>
+                </div>
+                <span style={{fontFamily:"var(--sm-font-mono)",fontSize:10,color:"var(--sm-sub)",width:20,textAlign:"right"}}>{n}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Volume hebdo ── */}
       {weeklyTrend.some(w=>w.vol>0)&&(
         <div style={S.card}>
           <MonoLabel>Volume — 6 dernières semaines</MonoLabel>
