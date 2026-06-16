@@ -26,12 +26,14 @@ export const EXERCISE_DB = [
   { name:"Face pull",                 muscle:"Épaules postérieures",muscles:["Trapèzes"],                             category:"isolation", tension:"contraction" },
   { name:"L'oiseau",                  muscle:"Épaules postérieures",muscles:[],                                       category:"isolation", tension:"etirement"   },
   { name:"Reverse fly",               muscle:"Épaules postérieures",muscles:[],                                       category:"isolation", tension:"etirement"   },
+  { name:"Reverse fly (unilatérale)", muscle:"Épaules postérieures",muscles:[],                                       category:"isolation", tension:"etirement"   },
   { name:"Rowing menton",             muscle:"Épaules latérales",   muscles:["Trapèzes","Biceps"],                    category:"compound",  tension:"contraction" },
 
   // ── Triceps ──────────────────────────────────────────────────────────────────
   { name:"Barre au front",            muscle:"Triceps",             muscles:[],                                       category:"isolation", tension:"etirement"   },
   { name:"Extension triceps (coude aux dessus de la tête)", muscle:"Triceps", muscles:[],                            category:"isolation", tension:"etirement"   },
   { name:"Extension triceps (coude près du corps)",         muscle:"Triceps", muscles:[],                            category:"isolation", tension:"contraction" },
+  { name:"Extension triceps unilatérale (coude près du corps)", muscle:"Triceps", muscles:[],                        category:"isolation", tension:"contraction" },
 
   // ── Grand dorsaux ─────────────────────────────────────────────────────────────
   { name:"Traction",                  muscle:"Grand dorsaux",       muscles:["Biceps","Trapèzes"],                    category:"compound",  tension:"etirement"   },
@@ -71,6 +73,7 @@ export const EXERCISE_DB = [
 
   // ── Ischio-jambiers ──────────────────────────────────────────────────────────
   { name:"Leg curl",                  muscle:"Ischio-jambiers",     muscles:[],                                       category:"isolation", tension:"contraction" },
+  { name:"Leg curl (unilateral)",     muscle:"Ischio-jambiers",     muscles:[],                                       category:"isolation", tension:"contraction" },
   { name:"Leg curl allongé",          muscle:"Ischio-jambiers",     muscles:[],                                       category:"isolation", tension:"contraction" },
   { name:"Rdl",                       muscle:"Ischio-jambiers",     muscles:["Fessiers","Lombaires"],                 category:"compound",  tension:"etirement"   },
   { name:"SL Deadlift",               muscle:"Ischio-jambiers",     muscles:["Fessiers","Lombaires"],                 category:"compound",  tension:"etirement"   },
