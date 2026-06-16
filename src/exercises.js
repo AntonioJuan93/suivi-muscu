@@ -19,23 +19,14 @@ export const EXERCISE_DB = [
   // ── Épaules ──────────────────────────────────────────────────────────────────
   { name:"Développé militaire",       muscle:"Épaules antérieures", muscles:["Triceps","Épaules latérales"],          category:"compound",  tension:"contraction" },
   { name:"Développé épaules",         muscle:"Épaules antérieures", muscles:["Triceps","Épaules latérales"],          category:"compound",  tension:"contraction" },
-  { name:"Élévations latérales",      muscle:"Épaules latérales",   muscles:[],                                       category:"isolation", tension:"neutre"      },
   { name:"Élévations frontales",      muscle:"Épaules antérieures", muscles:[],                                       category:"isolation", tension:"neutre"      },
   { name:"Face pull",                 muscle:"Épaules postérieures",muscles:["Trapèzes"],                             category:"isolation", tension:"contraction" },
-  { name:"Oiseau",                    muscle:"Épaules postérieures",muscles:[],                                       category:"isolation", tension:"etirement"   },
   { name:"Rowing menton",             muscle:"Épaules latérales",   muscles:["Trapèzes","Biceps"],                    category:"compound",  tension:"contraction" },
 
   // ── Triceps ──────────────────────────────────────────────────────────────────
-  { name:"Triceps poulie haute",      muscle:"Triceps",             muscles:[],                                       category:"isolation", tension:"contraction" },
-  { name:"Triceps corde",             muscle:"Triceps",             muscles:[],                                       category:"isolation", tension:"contraction" },
   { name:"Barre au front",            muscle:"Triceps",             muscles:[],                                       category:"isolation", tension:"etirement"   },
-  { name:"Extension triceps",         muscle:"Triceps",             muscles:[],                                       category:"isolation", tension:"etirement"   },
-  { name:"Kickback triceps",          muscle:"Triceps",             muscles:[],                                       category:"isolation", tension:"contraction" },
-  { name:"Dips triceps",              muscle:"Triceps",             muscles:["Épaules antérieures"],                  category:"compound",  tension:"etirement"   },
 
   // ── Grand dorsaux ─────────────────────────────────────────────────────────────
-  { name:"Tractions",                 muscle:"Grand dorsaux",       muscles:["Biceps","Trapèzes"],                    category:"compound",  tension:"etirement"   },
-  { name:"Tirage poulie haute",       muscle:"Grand dorsaux",       muscles:["Biceps","Trapèzes"],                    category:"compound",  tension:"contraction" },
   { name:"Tirage horizontal",         muscle:"Grand dorsaux",       muscles:["Biceps","Trapèzes","Lombaires"],        category:"compound",  tension:"contraction" },
   { name:"Rowing barre",              muscle:"Grand dorsaux",       muscles:["Biceps","Trapèzes","Lombaires"],        category:"compound",  tension:"contraction" },
   { name:"Rowing altère",             muscle:"Grand dorsaux",       muscles:["Biceps","Trapèzes"],                    category:"compound",  tension:"contraction" },
@@ -50,21 +41,16 @@ export const EXERCISE_DB = [
 
   // ── Lombaires ────────────────────────────────────────────────────────────────
   { name:"Soulevé de terre roumain",  muscle:"Lombaires",           muscles:["Ischio-jambiers","Fessiers"],           category:"compound",  tension:"etirement"   },
-  { name:"Hyperextensions",           muscle:"Lombaires",           muscles:["Fessiers","Ischio-jambiers"],           category:"isolation", tension:"etirement"   },
   { name:"Good morning",             muscle:"Lombaires",           muscles:["Ischio-jambiers","Fessiers"],           category:"compound",  tension:"etirement"   },
 
   // ── Biceps ───────────────────────────────────────────────────────────────────
-  { name:"Curl barre",                muscle:"Biceps",              muscles:["Avant-bras"],                           category:"isolation", tension:"contraction" },
-  { name:"Curl altères",              muscle:"Biceps",              muscles:["Avant-bras"],                           category:"isolation", tension:"contraction" },
   { name:"Curl marteau",              muscle:"Biceps",              muscles:["Avant-bras","Brachial"],                category:"isolation", tension:"neutre"      },
   { name:"Curl pupitre",              muscle:"Biceps",              muscles:[],                                       category:"isolation", tension:"etirement"   },
-  { name:"Curl poulie basse",         muscle:"Biceps",              muscles:[],                                       category:"isolation", tension:"etirement"   },
   { name:"Curl Zottman",              muscle:"Biceps",              muscles:["Avant-bras","Brachial"],                category:"isolation", tension:"contraction" },
 
   // ── Quadriceps ───────────────────────────────────────────────────────────────
   { name:"Squat",                     muscle:"Quadriceps",          muscles:["Fessiers","Ischio-jambiers","Lombaires"], category:"compound", tension:"etirement"  },
   { name:"Squat avant",               muscle:"Quadriceps",          muscles:["Fessiers"],                             category:"compound",  tension:"etirement"   },
-  { name:"Presse à cuisses",          muscle:"Quadriceps",          muscles:["Fessiers","Ischio-jambiers"],           category:"compound",  tension:"etirement"   },
   { name:"Leg extension",             muscle:"Quadriceps",          muscles:[],                                       category:"isolation", tension:"contraction" },
   { name:"Fentes",                    muscle:"Quadriceps",          muscles:["Fessiers","Ischio-jambiers"],           category:"compound",  tension:"etirement"   },
   { name:"Fentes bulgares",           muscle:"Quadriceps",          muscles:["Fessiers","Ischio-jambiers"],           category:"compound",  tension:"etirement"   },
@@ -73,7 +59,6 @@ export const EXERCISE_DB = [
 
   // ── Ischio-jambiers ──────────────────────────────────────────────────────────
   { name:"Leg curl allongé",          muscle:"Ischio-jambiers",     muscles:[],                                       category:"isolation", tension:"contraction" },
-  { name:"Leg curl assis",            muscle:"Ischio-jambiers",     muscles:[],                                       category:"isolation", tension:"etirement"   },
   { name:"SL Deadlift",               muscle:"Ischio-jambiers",     muscles:["Fessiers","Lombaires"],                 category:"compound",  tension:"etirement"   },
   { name:"Nordic curl",               muscle:"Ischio-jambiers",     muscles:[],                                       category:"isolation", tension:"etirement"   },
 
@@ -91,7 +76,6 @@ export const EXERCISE_DB = [
 
   // ── Abdos ────────────────────────────────────────────────────────────────────
   { name:"Crunch",                    muscle:"Abdos",               muscles:[],                                       category:"isolation", tension:"contraction" },
-  { name:"Crunch câble",              muscle:"Abdos",               muscles:[],                                       category:"isolation", tension:"contraction" },
   { name:"Relevé de jambes",          muscle:"Abdos",               muscles:["Fléchisseurs hanche"],                  category:"isolation", tension:"etirement"   },
   { name:"Planche",                   muscle:"Abdos",               muscles:["Lombaires"],                            category:"isolation", tension:"neutre"      },
   { name:"Russian twist",             muscle:"Abdos",               muscles:[],                                       category:"isolation", tension:"neutre"      },
