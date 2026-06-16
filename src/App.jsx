@@ -3,7 +3,7 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContai
 import { MUSCLE_GROUPS, INITIAL_PROGRAMS, T, makeStyles, formatDate, calcVolume, estimate1RM, startOfWeek } from "./theme";
 import { loadData, saveData } from "./storage";
 import { supabase } from "./supabase";
-import { loadCloud, saveCloud, clearCloudCache, searchUserByEmail, fetchAllUsers } from "./cloud";
+import { loadCloud, saveCloud, clearCloudCache, searchUserByEmail, fetchAllUsers, createBackup, listBackups, restoreBackup } from "./cloud";
 import { EXERCISE_DB } from "./exercises";
 import Auth from "./Auth";
 
@@ -706,6 +706,9 @@ export default function App() {
   const [partnerLoading, setPartnerLoading] = useState(false);
   const [partnerError, setPartnerError] = useState("");
   const [partnerUsers, setPartnerUsers] = useState([]);
+  const [backups, setBackups] = useState([]);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [restoreConfirm, setRestoreConfirm] = useState(null);
 
   const S = useMemo(()=>makeStyles(),[]);
   const allExercisesList = useMemo(()=>{
@@ -853,7 +856,7 @@ export default function App() {
   useEffect(()=>{
     const{data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{
       const u=session?.user??null;setUser(u);
-      if(event==="INITIAL_SESSION"){setAuthReady(true);if(u){loadCloud().then(d=>{if(d)applyData(d,false);setCloudLoaded(true);});fetchAllUsers().then(setPartnerUsers);}}
+      if(event==="INITIAL_SESSION"){setAuthReady(true);if(u){loadCloud().then(d=>{if(d)applyData(d,false);setCloudLoaded(true);});fetchAllUsers().then(setPartnerUsers);listBackups().then(bs=>{setBackups(bs);const last=bs[0];const needsBackup=!last||((Date.now()-new Date(last.created_at).getTime())>7*24*60*60*1000);if(needsBackup)loadCloud().then(d=>{if(d)createBackup(d).then(()=>listBackups().then(setBackups));});});}}
       if(event==="SIGNED_IN"){loadCloud().then(d=>{if(d)applyData(d,false);setCloudLoaded(true);});fetchAllUsers().then(setPartnerUsers);}
       if(event==="SIGNED_OUT"){clearCloudCache();setCloudLoaded(false);setSessions([]);setPrograms(INITIAL_PROGRAMS);setDarkMode(false);resetDraft();setMode("free");saveData(null);setPartnerUsers([]);}
     });
@@ -963,6 +966,8 @@ export default function App() {
   }
 
   function exportJSON(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify({sessions,programs,customExercises,theme:darkMode?"dark":""},null,2)],{type:"application/json"}));a.download="suivi_muscu.json";a.click();}
+  async function manualBackup(){setBackupLoading(true);await createBackup(fullData());const bs=await listBackups();setBackups(bs);setBackupLoading(false);}
+  async function handleRestore(id){const d=await restoreBackup(id);if(d){applyData(d,false);await saveCloud(d);setRestoreConfirm(null);}}
   function exportCSV(){
     const rows=[["Date","Programme","Exercice","Muscle","Série","Échauffement","Poids","Reps","RPE","Volume","1RM","Repos (s)"]];
     sessions.forEach(s=>s.exercises.forEach(e=>e.sets.forEach((st,si)=>{
@@ -1880,6 +1885,32 @@ export default function App() {
               <label style={{...S.btnS,padding:"10px 18px",display:"inline-block",cursor:"pointer"}}>Importer JSON<input type="file" accept=".json" onChange={importJSON} style={{display:"none"}}/></label>
               {importSuccess&&<p style={{margin:"10px 0 0",fontSize:12,color:"var(--sm-up)"}}>Import réussi !</p>}
               {importError&&<p style={{margin:"10px 0 0",fontSize:12,color:"#e05555"}}>{importError}</p>}
+
+              <div style={{marginTop:18,paddingTop:16,borderTop:"1px solid var(--sm-line)"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+                  <span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",letterSpacing:".08em",textTransform:"uppercase"}}>Sauvegardes ({backups.length}/8)</span>
+                  <button onClick={manualBackup} disabled={backupLoading} style={{...S.btnS,padding:"6px 14px",fontSize:11,opacity:backupLoading?0.5:1}}>
+                    {backupLoading?"Sauvegarde…":"+ Créer une sauvegarde"}
+                  </button>
+                </div>
+                {backups.length===0&&<p style={{fontSize:11,color:"var(--sm-sub)",fontStyle:"italic",fontFamily:"var(--sm-font-serif)"}}>Aucune sauvegarde pour l'instant. Une sauvegarde automatique est créée chaque semaine.</p>}
+                {backups.map((b,i)=>{
+                  const d=new Date(b.created_at);
+                  const label=d.toLocaleDateString("fr-FR",{day:"2-digit",month:"short",year:"numeric"})+" · "+d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+                  return(
+                    <div key={b.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 0",borderBottom:i<backups.length-1?"1px solid var(--sm-line)":"none"}}>
+                      <span style={{fontSize:12,color:"var(--sm-txt)",fontFamily:"var(--sm-font-mono)"}}>{label}{i===0&&<span style={{marginLeft:6,fontSize:9,color:"var(--sm-up)",background:"rgba(47,158,109,.12)",borderRadius:8,padding:"2px 6px"}}>récente</span>}</span>
+                      {restoreConfirm===b.id
+                        ?<div style={{display:"flex",gap:6}}>
+                          <button onClick={()=>handleRestore(b.id)} style={{...S.btnP,padding:"5px 12px",fontSize:11}}>Confirmer</button>
+                          <button onClick={()=>setRestoreConfirm(null)} style={{...S.btnS,padding:"5px 12px",fontSize:11}}>Annuler</button>
+                        </div>
+                        :<button onClick={()=>setRestoreConfirm(b.id)} style={{...S.btnS,padding:"5px 12px",fontSize:11}}>Restaurer</button>
+                      }
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
