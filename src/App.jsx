@@ -17,7 +17,7 @@ const EQUIPMENT = [
 ];
 function equipLabel(v){ return EQUIPMENT.find(e=>e.v===v)?.l||""; }
 function gripKey(g){ if(!g)return""; return[g.orientation,g.barPos,g.width,g.barType,g.handle].filter(Boolean).join("-"); }
-function exKey(name,equip,grip){ return name+(equip?":::"+equip:"")+(gripKey(grip)?":::"+gripKey(grip):""); }
+function exKey(name,equip,grip,unilateral){ return name+(equip?":::"+equip:"")+(gripKey(grip)?":::"+gripKey(grip):"")+(unilateral?":::unil":""); }
 
 const GRIP_CONFIGS = {
   push:  { sections:[
@@ -370,7 +370,7 @@ function PartnerProfile({ data, email, S }) {
   // ── Progression par exercice (top 5 les plus pratiqués dans le programme sélectionné) ──
   const exFreq = {};
   filtered.forEach(s=>s.exercises.forEach(e=>{
-    const k=exKey(e.name,e.equipment||"");
+    const k=exKey(e.name,e.equipment||"",null,e.unilateral);
     exFreq[k]=(exFreq[k]||0)+1;
   }));
   const topExKeys = Object.entries(exFreq).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k])=>k);
@@ -759,30 +759,31 @@ export default function App() {
     if(avg<2)return 0.90; if(avg<2.5)return 0.94; if(avg<3.5)return 0.97; return 1.0;
   }
 
-  function getLastForExercise(name,equipment,grip){
+  function getLastForExercise(name,equipment,grip,unilateral){
     const sorted=[...sessions].sort((a,b)=>b.date.localeCompare(a.date));
     const gk=gripKey(grip);
-    const match=e=>e.name===name&&(e.equipment||"")===(equipment||"")&&(!gk||gripKey(e.grip)===gk);
+    const match=e=>e.name===name&&(e.equipment||"")===(equipment||"")&&(!gk||gripKey(e.grip)===gk)&&!!e.unilateral===!!unilateral;
     const lastS=sorted.find(s=>s.exercises.some(match));
     if(!lastS)return null;
     const ex=lastS.exercises.find(match);
-    const working=(ex.sets||[]).filter(s=>!s.isWarmup&&(s.weight||s.reps));
+    const working=(ex.sets||[]).filter(s=>!s.isWarmup&&(s.weight||s.reps||s.repsL||s.repsR));
     const daysAgo=Math.round((Date.now()-new Date(lastS.date))/86400000);
     const maxW=Math.max(0,...working.map(s=>parseFloat(s.weight)||0));
-    return{daysAgo,date:lastS.date,sets:working,maxWeight:maxW,repsPerSet:working.map(s=>parseInt(s.reps)||0)};
+    const repsPerSet=working.map(s=>unilateral?Math.max(parseInt(s.repsL)||0,parseInt(s.repsR)||0):(parseInt(s.reps)||0));
+    return{daysAgo,date:lastS.date,sets:working,maxWeight:maxW,repsPerSet};
   }
 
-  function getSuggestion(name,equipment,targetReps){
+  function getSuggestion(name,equipment,targetReps,unilateral){
     if(!targetReps)return null;
-    const last=getLastForExercise(name,equipment);
+    const last=getLastForExercise(name,equipment,undefined,unilateral);
     if(!last)return null;
     const[minR,maxR]=parseRepRange(targetReps);
     if(!minR)return null;
-    const working=last.sets.filter(s=>parseInt(s.reps)>0);
-    if(!working.length)return null;
+    const repsArr=last.repsPerSet.filter(r=>r>0);
+    if(!repsArr.length)return null;
     const top=maxR||minR;
-    const allAtTop=working.every(s=>(parseInt(s.reps)||0)>=top);
-    const allInRange=working.every(s=>(parseInt(s.reps)||0)>=minR);
+    const allAtTop=repsArr.every(r=>r>=top);
+    const allInRange=repsArr.every(r=>r>=minR);
     if(allAtTop)return{direction:"up",reason:`Toutes les séries ≥ ${top} reps — augmenter le poids`};
     if(allInRange)return{direction:"hold",reason:`Dans la fourchette — vise ${top} reps sur toutes les séries`};
     return{direction:"down",reason:`Reps sous la cible (min ${minR}) — consolider le poids actuel`};
@@ -816,7 +817,7 @@ export default function App() {
   }
   function applyData(d,withDraft){
     if(!d)return;
-    if(d.sessions)setSessions(d.sessions);
+    if(d.sessions)setSessions(d.sessions.map(s=>({...s,exercises:s.exercises.map(e=>e.name==="Reverse fly (unilatérale)"?{...e,name:"Reverse fly",unilateral:true}:e)})));
     if(d.programs)setPrograms(d.programs);
     if(d.customExercises)setCustomExercises(d.customExercises);
     if(d.theme==="dark")setDarkMode(true);
@@ -889,7 +890,7 @@ export default function App() {
       const muscle=exMuscle||p.muscles[Math.min(i,p.muscles.length-1)]||MUSCLE_GROUPS[0];
       const targetReps=(typeof ex==="object"&&ex.targetReps)||"";
       const targetSets=parseInt((typeof ex==="object"&&ex.targetSets)||"3")||3;
-      const last=getLastForExercise(name,equipment);
+      const last=getLastForExercise(name,equipment,undefined,false);
       const defaultWeight=last?.maxWeight?String(last.maxWeight):"";
       const sets=Array.from({length:targetSets},()=>({weight:defaultWeight,reps:"",repsL:"",repsR:"",rpe:"",isWarmup:false,restMs:null,note:"",repsExtra:""}));
       return{id:now+i,name,muscle,equipment,notes:"",sets,target:{sets:targetSets,reps:targetReps,type:p.type||"volume"}};
@@ -936,7 +937,7 @@ export default function App() {
       const already=[...EXERCISE_DB,...customExercises].some(e=>e.name===name.trim()&&e.muscle===muscle);
       if(!already) setCustomExercises(prev=>[...prev,{name:name.trim(),muscle,muscles,category,tension,gripProfile,custom:true}]);
     }
-    const last=getLastForExercise(name,equipment);
+    const last=getLastForExercise(name,equipment,undefined,unilateral);
     setExercises(ex=>[...ex,{id:Date.now(),name:name.trim(),muscle,equipment,unilateral,grip,gripNote,notes:"",sets:[{weight:last?.maxWeight?String(last.maxWeight):"",reps:"",rpe:"",isWarmup:false,restMs:null,note:""}]}]);
     setShowExPicker(false);
   }
@@ -989,7 +990,7 @@ export default function App() {
 
   const allExVariants=useMemo(()=>{
     const seen=new Set(),result=[];
-    sessions.forEach(s=>s.exercises.forEach(e=>{const k=exKey(e.name,e.equipment||"");if(!seen.has(k)){seen.add(k);result.push({name:e.name,equipment:e.equipment||"",key:k});}}));
+    sessions.forEach(s=>s.exercises.forEach(e=>{const k=exKey(e.name,e.equipment||"",null,e.unilateral);if(!seen.has(k)){seen.add(k);result.push({name:e.name,equipment:e.equipment||"",unilateral:!!e.unilateral,key:k});}}));
     return result.sort((a,b)=>a.name.localeCompare(b.name)||a.equipment.localeCompare(b.equipment));
   },[sessions]);
 
@@ -998,7 +999,7 @@ export default function App() {
   const prSet=useMemo(()=>{
     const best={},prs=new Set();
     [...sessions].sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id).forEach(s=>s.exercises.forEach(e=>{
-      const k=exKey(e.name,e.equipment||"");
+      const k=exKey(e.name,e.equipment||"",null,e.unilateral);
       const mw=Math.max(0,...(e.sets||[]).filter(st=>!st.isWarmup).map(st=>parseFloat(st.weight)||0));
       if(mw>0&&mw>(best[k]||0)){best[k]=mw;prs.add(s.id+":"+k);}
     }));
@@ -1281,8 +1282,8 @@ export default function App() {
             )}
 
             {exercises.map(ex=>{
-              const last=getLastForExercise(ex.name,ex.equipment);
-              const sugg=getSuggestion(ex.name,ex.equipment,ex.target?.reps);
+              const last=getLastForExercise(ex.name,ex.equipment,undefined,ex.unilateral);
+              const sugg=getSuggestion(ex.name,ex.equipment,ex.target?.reps,ex.unilateral);
               return(
                 <div key={ex.id} style={S.card}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
@@ -1304,11 +1305,18 @@ export default function App() {
                       {ex.gripNote&&<span style={{fontStyle:"italic",color:"var(--sm-sub)"}}>{ex.gripNote}</span>}
                     </div>
                   )}
-                  {last&&(
-                    <div style={{fontSize:10,marginBottom:8,color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".04em"}}>
-                      {last.daysAgo===0?"Aujourd'hui":last.daysAgo===1?"Hier":`Il y a ${last.daysAgo}j`}
-                    </div>
-                  )}
+                  {last&&(()=>{
+                    const validReps=last.repsPerSet.filter(r=>r>0);
+                    const minR=validReps.length?Math.min(...validReps):0;
+                    const maxR=validReps.length?Math.max(...validReps):0;
+                    const repsStr=validReps.length?(minR===maxR?`${minR}`:`${minR}-${maxR}`):"";
+                    const setsStr=last.sets.length&&repsStr?` · ${last.sets.length}×${repsStr}`:last.sets.length?` · ${last.sets.length} séries`:"";
+                    return(
+                      <div style={{fontSize:10,marginBottom:8,color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".04em"}}>
+                        {last.daysAgo===0?"Aujourd'hui":last.daysAgo===1?"Hier":`Il y a ${last.daysAgo}j`}{setsStr}
+                      </div>
+                    );
+                  })()}
 
                   {(()=>{
                     const exProfile=getGripProfile(ex);
@@ -1343,8 +1351,16 @@ export default function App() {
                       const curR=ex.unilateral?Math.max(parseInt(s.repsL)||0,parseInt(s.repsR)||0):(parseInt(s.reps)||0);
                       const lastW=parseFloat(lastSet?.weight)||0;
                       const lastR=ex.unilateral?Math.max(parseInt(lastSet?.repsL)||0,parseInt(lastSet?.repsR)||0):(parseInt(lastSet?.reps)||0);
-                      const wentUp=curW>0&&lastW>0&&curW>lastW;
-                      const wentDown=curW>0&&lastW>0&&curW<lastW;
+                      const programType=ex.target?.type||"volume";
+                      let wentUp=false,wentDown=false;
+                      if(curW>0&&lastW>0){
+                        if(curW>lastW)wentUp=true;
+                        else if(curW<lastW)wentDown=true;
+                        else if(curR>0&&lastR>0){
+                          if(curR>lastR)wentUp=true;
+                          else if(curR<lastR){if(programType==="force"){if(curR<lastR-2)wentDown=true;}else wentDown=true;}
+                        }
+                      }
                       return(
                         <div key={si} style={{marginBottom:6}}>
                           <div style={{display:"grid",gridTemplateColumns:"18px 22px 1fr 1fr 24px",gap:5,alignItems:"center",opacity:s.isWarmup?0.6:1}}>
@@ -1524,7 +1540,7 @@ export default function App() {
                       const working=(e.sets||[]).filter(st=>!st.isWarmup&&(st.weight||st.reps));
                       const warmupSets=(e.sets||[]).filter(st=>st.isWarmup&&(st.weight||st.reps));
                       const restTimes=working.filter(st=>st.restMs&&st.restMs>5000).map(st=>formatRest(st.restMs)).filter(Boolean);
-                      const isPR=prSet.has(s.id+":"+exKey(e.name,e.equipment||""));
+                      const isPR=prSet.has(s.id+":"+exKey(e.name,e.equipment||"",null,e.unilateral));
                       return(
                         <div key={i} style={{marginBottom:12,paddingBottom:12,borderBottom:i<s.exercises.length-1?"1px solid var(--sm-line)":"none"}}>
                           <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,flexWrap:"wrap"}}>

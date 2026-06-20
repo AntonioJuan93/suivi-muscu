@@ -26,7 +26,6 @@ export const EXERCISE_DB = [
   { name:"Face pull",                 muscle:"Épaules postérieures",muscles:["Trapèzes"],                             category:"isolation", tension:"contraction" },
   { name:"L'oiseau",                  muscle:"Épaules postérieures",muscles:[],                                       category:"isolation", tension:"etirement"   },
   { name:"Reverse fly",               muscle:"Épaules postérieures",muscles:[],                                       category:"isolation", tension:"etirement"   },
-  { name:"Reverse fly (unilatérale)", muscle:"Épaules postérieures",muscles:[],                                       category:"isolation", tension:"etirement"   },
   { name:"Rowing menton",             muscle:"Épaules latérales",   muscles:["Trapèzes","Biceps"],                    category:"compound",  tension:"contraction" },
 
   // ── Triceps ──────────────────────────────────────────────────────────────────
