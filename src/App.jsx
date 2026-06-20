@@ -1040,7 +1040,7 @@ export default function App() {
       const avgRepsR=working.length?Math.round(working.reduce((a,st)=>a+(parseInt(st.repsR)||0),0)/working.length*10)/10:0;
       return{date:s.date,label:formatDate(s.date),maxWeight:Math.max(0,...working.map(st=>parseFloat(st.weight)||0)),volume:wVolume(e.sets),orm:Math.max(0,...working.map(st=>estimate1RM(st.weight,st.reps))),rating:s.rating,avgRPE,avgRepsL,avgRepsR};
     })).sort((a,b)=>a.date.localeCompare(b.date))
-  ,[sessions,progressKey,progressEx,progressEquip,progressUnilateral]);
+  ,[sessions,progressKey,progressEx,progressUnilateral]);
 
   const bwData=useMemo(()=>
     [...sessions].filter(s=>s.bodyweight).map(s=>({date:s.date,label:formatDate(s.date),weight:parseFloat(s.bodyweight)||0})).sort((a,b)=>a.date.localeCompare(b.date))
