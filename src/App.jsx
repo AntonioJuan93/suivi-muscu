@@ -728,8 +728,10 @@ export default function App() {
     return [...filteredDB,...customExercises,...sessionDerived];
   },[customExercises,sessions]);
   const saveTimer = useRef(null);
+  const deletedIdsRef = useRef([]);
 
   useEffect(()=>{ document.documentElement.dataset.theme = darkMode?"dark":""; },[darkMode]);
+  useEffect(()=>{ deletedIdsRef.current = deletedIds; },[deletedIds]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   function wVolume(sets){
@@ -823,8 +825,9 @@ export default function App() {
   function applyData(d,withDraft){
     if(!d)return;
     const incomingDeleted=d.deletedIds||[];
-    const mergedDeletedIds=[...new Set([...deletedIds,...incomingDeleted])];
-    if(incomingDeleted.length)setDeletedIds(mergedDeletedIds);
+    const mergedDeletedIds=[...new Set([...deletedIdsRef.current,...incomingDeleted])];
+    deletedIdsRef.current=mergedDeletedIds;
+    setDeletedIds(mergedDeletedIds);
     if(d.sessions)setSessions(prev=>{
       const tombstones=new Set(mergedDeletedIds);
       const migrated=migrateSessions(d.sessions).filter(s=>!tombstones.has(s.id));
@@ -894,7 +897,8 @@ export default function App() {
   function deleteProgram(id){setPrograms(ps=>ps.filter(p=>p.id!==id));setConfirmDelete(null);}
   function deleteSession(id){
     const newSessions=sessions.filter(s=>s.id!==id);
-    const newDeletedIds=[...new Set([...deletedIds,id])];
+    const newDeletedIds=[...new Set([...deletedIdsRef.current,id])];
+    deletedIdsRef.current=newDeletedIds;
     setSessions(newSessions);
     setDeletedIds(newDeletedIds);
     setConfirmDelete(null);
