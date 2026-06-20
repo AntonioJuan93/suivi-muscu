@@ -710,6 +710,7 @@ export default function App() {
   const [backupLoading, setBackupLoading] = useState(false);
   const [restoreConfirm, setRestoreConfirm] = useState(null);
   const [editingExId, setEditingExId] = useState(null);
+  const [deletedIds, setDeletedIds] = useState([]);
 
   const S = useMemo(()=>makeStyles(),[]);
   const allExercisesList = useMemo(()=>{
@@ -802,7 +803,7 @@ export default function App() {
 
   // ── Persistence ───────────────────────────────────────────────────────────
   function fullData(){
-    return{sessions,programs,customExercises,theme:darkMode?"dark":"",email:user?.email||"",
+    return{sessions,programs,customExercises,theme:darkMode?"dark":"",email:user?.email||"",deletedIds,
       draft:{exercises,sessionDate,sessionDuration,sessionNotes,sessionBodyweight,sessionRating,sessionSleep,sessionEnergy,mode,selectedProgram}};
   }
 
@@ -821,10 +822,14 @@ export default function App() {
   }
   function applyData(d,withDraft){
     if(!d)return;
+    const incomingDeleted=d.deletedIds||[];
+    const mergedDeletedIds=[...new Set([...deletedIds,...incomingDeleted])];
+    if(incomingDeleted.length)setDeletedIds(mergedDeletedIds);
     if(d.sessions)setSessions(prev=>{
-      const migrated=migrateSessions(d.sessions);
+      const tombstones=new Set(mergedDeletedIds);
+      const migrated=migrateSessions(d.sessions).filter(s=>!tombstones.has(s.id));
       const cloudIds=new Set(migrated.map(s=>s.id));
-      const localOnly=prev.filter(s=>!cloudIds.has(s.id));
+      const localOnly=prev.filter(s=>!cloudIds.has(s.id)&&!tombstones.has(s.id));
       return[...localOnly,...migrated].sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
     });
     if(d.programs)setPrograms(d.programs);
@@ -889,9 +894,11 @@ export default function App() {
   function deleteProgram(id){setPrograms(ps=>ps.filter(p=>p.id!==id));setConfirmDelete(null);}
   function deleteSession(id){
     const newSessions=sessions.filter(s=>s.id!==id);
+    const newDeletedIds=[...new Set([...deletedIds,id])];
     setSessions(newSessions);
+    setDeletedIds(newDeletedIds);
     setConfirmDelete(null);
-    const snap={...fullData(),sessions:newSessions};
+    const snap={...fullData(),sessions:newSessions,deletedIds:newDeletedIds};
     saveData(snap);
     if(user&&cloudLoaded)saveCloud(snap);
   }
