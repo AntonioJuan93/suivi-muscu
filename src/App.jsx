@@ -1646,7 +1646,7 @@ export default function App() {
               <MonoLabel>Exercice à analyser</MonoLabel>
               <select value={progressKey} onChange={e=>setProgressKey(e.target.value)} style={S.inp}>
                 <option value="">-- Choisir un exercice --</option>
-                {allExVariants.map(v=><option key={v.key} value={v.key}>{v.name}{v.equipment?` — ${equipLabel(v.equipment)}`:""}{v.unilateral?" (Unilatéral)":""}</option>)}
+                {allExVariants.filter(v=>!/unilatér|unilateral/i.test(v.name)).map(v=><option key={v.key} value={v.key}>{v.name}{v.equipment?` — ${equipLabel(v.equipment)}`:""}{v.unilateral?" (Unilatéral)":""}</option>)}
               </select>
             </div>
 
