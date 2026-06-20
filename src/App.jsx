@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, Legend } from "recharts";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
 import { MUSCLE_GROUPS, INITIAL_PROGRAMS, T, makeStyles, formatDate, calcVolume, estimate1RM, startOfWeek } from "./theme";
 import { loadData, saveData } from "./storage";
 import { supabase } from "./supabase";
@@ -1718,23 +1718,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {progressUnilateral&&progressData.some(d=>d.avgRepsL>0||d.avgRepsR>0)&&(
-                    <div style={S.card}>
-                      <p style={{margin:"0 0 4px",fontSize:14,fontWeight:700,color:"var(--sm-ink)"}}>Reps Gauche vs Droite</p>
-                      <p style={{margin:"0 0 12px",fontSize:11,color:"var(--sm-sub)",fontFamily:"var(--sm-font-serif)",fontStyle:"italic"}}>Moyenne de reps par série, par côté</p>
-                      <div style={{width:"100%",height:180}}>
-                        <ResponsiveContainer><LineChart data={progressData} margin={{top:5,right:10,left:-10,bottom:0}}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--sm-line)"/>
-                          <XAxis dataKey="label" tick={{fontSize:10,fill:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)"}} stroke="var(--sm-line)"/>
-                          <YAxis tick={{fontSize:11,fill:"var(--sm-sub)"}} stroke="var(--sm-line)"/>
-                          <Tooltip contentStyle={{background:"var(--sm-card)",border:"1px solid var(--sm-line)",borderRadius:14,fontSize:12,color:"var(--sm-ink)"}} formatter={(v,n)=>[`${v} reps`,n]}/>
-                          <Legend iconType="circle" iconSize={8} wrapperStyle={{fontSize:11,fontFamily:"var(--sm-font-mono)",paddingTop:8}}/>
-                          <Line type="monotone" dataKey="avgRepsL" name="Gauche" stroke="var(--sm-accent)" strokeWidth={2} dot={{r:3,fill:"var(--sm-accent)"}}/>
-                          <Line type="monotone" dataKey="avgRepsR" name="Droite" stroke="var(--sm-up)" strokeWidth={2} dot={{r:3,fill:"var(--sm-up)"}}/>
-                        </LineChart></ResponsiveContainer>
-                      </div>
-                    </div>
-                  )}
 
                   <div style={S.card}>
                     <p style={{margin:"0 0 12px",fontSize:14,fontWeight:700,color:"var(--sm-ink)"}}>Historique détaillé</p>
