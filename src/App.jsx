@@ -709,6 +709,7 @@ export default function App() {
   const [backups, setBackups] = useState([]);
   const [backupLoading, setBackupLoading] = useState(false);
   const [restoreConfirm, setRestoreConfirm] = useState(null);
+  const [editingExId, setEditingExId] = useState(null);
 
   const S = useMemo(()=>makeStyles(),[]);
   const allExercisesList = useMemo(()=>{
@@ -986,7 +987,8 @@ export default function App() {
 
   // ── Computed ──────────────────────────────────────────────────────────────
   const progressEx=progressKey?progressKey.split(":::")[0]:"";
-  const progressEquip=progressKey?(progressKey.split(":::")[1]||""):"";
+  const progressUnilateral=!!(progressKey?.includes(":::unil"));
+  const progressEquip=(()=>{const p=progressKey?.split(":::")||[];return p.length>1&&p[1]!=="unil"?p[1]:"";})();
 
   const allExVariants=useMemo(()=>{
     const seen=new Set(),result=[];
@@ -1007,13 +1009,15 @@ export default function App() {
   },[sessions]);
 
   const progressData=useMemo(()=>
-    sessions.flatMap(s=>s.exercises.filter(e=>e.name===progressEx&&(e.equipment||"")===(progressEquip||"")).map(e=>{
+    sessions.flatMap(s=>s.exercises.filter(e=>e.name===progressEx&&(e.equipment||"")===(progressEquip||"")&&!!e.unilateral===progressUnilateral).map(e=>{
       const working=(e.sets||[]).filter(st=>!st.isWarmup);
       const withRPE=working.filter(st=>st.rpe);
       const avgRPE=withRPE.length?Math.round(withRPE.reduce((a,st)=>a+(parseFloat(st.rpe)||0),0)/withRPE.length*10)/10:null;
-      return{date:s.date,label:formatDate(s.date),maxWeight:Math.max(0,...working.map(st=>parseFloat(st.weight)||0)),volume:wVolume(e.sets),orm:Math.max(0,...working.map(st=>estimate1RM(st.weight,st.reps))),rating:s.rating,avgRPE};
+      const avgRepsL=working.length?Math.round(working.reduce((a,st)=>a+(parseInt(st.repsL)||0),0)/working.length*10)/10:0;
+      const avgRepsR=working.length?Math.round(working.reduce((a,st)=>a+(parseInt(st.repsR)||0),0)/working.length*10)/10:0;
+      return{date:s.date,label:formatDate(s.date),maxWeight:Math.max(0,...working.map(st=>parseFloat(st.weight)||0)),volume:wVolume(e.sets),orm:Math.max(0,...working.map(st=>estimate1RM(st.weight,st.reps))),rating:s.rating,avgRPE,avgRepsL,avgRepsR};
     })).sort((a,b)=>a.date.localeCompare(b.date))
-  ,[sessions,progressKey]);
+  ,[sessions,progressKey,progressEx,progressEquip,progressUnilateral]);
 
   const bwData=useMemo(()=>
     [...sessions].filter(s=>s.bodyweight).map(s=>({date:s.date,label:formatDate(s.date),weight:parseFloat(s.bodyweight)||0})).sort((a,b)=>a.date.localeCompare(b.date))
@@ -1296,8 +1300,33 @@ export default function App() {
                       </select>
                       {ex.target?.reps&&<span style={{fontSize:10,color:"var(--sm-sub)",background:"var(--sm-card2)",border:"1px solid var(--sm-line)",borderRadius:20,padding:"3px 9px",fontFamily:"var(--sm-font-mono)",letterSpacing:".05em"}}>Cible {ex.target.sets?`${ex.target.sets}×`:""} {ex.target.reps}</span>}
                     </div>
-                    <button onClick={()=>removeExercise(ex.id)} style={{...S.btnS,padding:"4px 10px",fontSize:11,flexShrink:0}}>✕</button>
+                    <div style={{display:"flex",gap:4,flexShrink:0}}>
+                      <button onClick={()=>setEditingExId(editingExId===ex.id?null:ex.id)} style={{...S.btnS,padding:"4px 10px",fontSize:11,color:editingExId===ex.id?"var(--sm-accent)":"var(--sm-sub)",borderColor:editingExId===ex.id?"var(--sm-accent)":"var(--sm-line)"}}>✎</button>
+                      <button onClick={()=>removeExercise(ex.id)} style={{...S.btnS,padding:"4px 10px",fontSize:11}}>✕</button>
+                    </div>
                   </div>
+                  {editingExId===ex.id&&(
+                    <div style={{background:"var(--sm-card2)",borderRadius:14,padding:"12px 14px",marginBottom:10,border:"1px solid var(--sm-line)"}}>
+                      <div style={{marginBottom:10}}>
+                        <span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",letterSpacing:".08em",textTransform:"uppercase",display:"block",marginBottom:4}}>Exercice</span>
+                        <select value={ex.name} onChange={e=>{const found=[...EXERCISE_DB,...customExercises].find(x=>x.name===e.target.value);setExercises(xs=>xs.map(x=>x.id===ex.id?{...x,name:e.target.value,...(found?{muscle:found.muscle}:{})}:x));}} style={{...S.inp,fontSize:12}}>
+                          {[...EXERCISE_DB,...customExercises].sort((a,b)=>a.name.localeCompare(b.name)).map(e=><option key={e.name} value={e.name}>{e.name}</option>)}
+                        </select>
+                      </div>
+                      <div style={{marginBottom:10}}>
+                        <span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",letterSpacing:".08em",textTransform:"uppercase",display:"block",marginBottom:4}}>Muscle principal</span>
+                        <select value={ex.muscle} onChange={e=>setExercises(xs=>xs.map(x=>x.id===ex.id?{...x,muscle:e.target.value}:x))} style={{...S.inp,fontSize:12}}>
+                          {MUSCLE_GROUPS.map(m=><option key={m} value={m}>{m}</option>)}
+                        </select>
+                      </div>
+                      <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                        <span style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",letterSpacing:".08em",textTransform:"uppercase"}}>Unilatéral</span>
+                        <button onClick={()=>setExercises(xs=>xs.map(x=>x.id===ex.id?{...x,unilateral:!x.unilateral}:x))} style={{fontSize:11,border:`1px solid ${ex.unilateral?"var(--sm-up)":"var(--sm-line)"}`,borderRadius:20,padding:"3px 12px",cursor:"pointer",background:ex.unilateral?"rgba(47,158,109,.12)":"transparent",color:ex.unilateral?"var(--sm-up)":"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".06em"}}>
+                          {ex.unilateral?"Oui":"Non"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {(ex.grip&&gripKey(ex.grip)||ex.gripNote)&&(
                     <div style={{fontSize:10,color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",letterSpacing:".04em",marginBottom:6,display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -1603,7 +1632,7 @@ export default function App() {
               <MonoLabel>Exercice à analyser</MonoLabel>
               <select value={progressKey} onChange={e=>setProgressKey(e.target.value)} style={S.inp}>
                 <option value="">-- Choisir un exercice --</option>
-                {allExVariants.map(v=><option key={v.key} value={v.key}>{v.name}{v.equipment?` — ${equipLabel(v.equipment)}`:""}</option>)}
+                {allExVariants.map(v=><option key={v.key} value={v.key}>{v.name}{v.equipment?` — ${equipLabel(v.equipment)}`:""}{v.unilateral?" (Unilatéral)":""}</option>)}
               </select>
             </div>
 
@@ -1665,6 +1694,24 @@ export default function App() {
                       </BarChart></ResponsiveContainer>
                     </div>
                   </div>
+
+                  {progressUnilateral&&progressData.some(d=>d.avgRepsL>0||d.avgRepsR>0)&&(
+                    <div style={S.card}>
+                      <p style={{margin:"0 0 4px",fontSize:14,fontWeight:700,color:"var(--sm-ink)"}}>Reps Gauche vs Droite</p>
+                      <p style={{margin:"0 0 12px",fontSize:11,color:"var(--sm-sub)",fontFamily:"var(--sm-font-serif)",fontStyle:"italic"}}>Moyenne de reps par série, par côté</p>
+                      <div style={{width:"100%",height:180}}>
+                        <ResponsiveContainer><LineChart data={progressData} margin={{top:5,right:10,left:-10,bottom:0}}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--sm-line)"/>
+                          <XAxis dataKey="label" tick={{fontSize:10,fill:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)"}} stroke="var(--sm-line)"/>
+                          <YAxis tick={{fontSize:11,fill:"var(--sm-sub)"}} stroke="var(--sm-line)"/>
+                          <Tooltip contentStyle={{background:"var(--sm-card)",border:"1px solid var(--sm-line)",borderRadius:14,fontSize:12,color:"var(--sm-ink)"}} formatter={(v,n)=>[`${v} reps`,n]}/>
+                          <Legend iconType="circle" iconSize={8} wrapperStyle={{fontSize:11,fontFamily:"var(--sm-font-mono)",paddingTop:8}}/>
+                          <Line type="monotone" dataKey="avgRepsL" name="Gauche" stroke="var(--sm-accent)" strokeWidth={2} dot={{r:3,fill:"var(--sm-accent)"}}/>
+                          <Line type="monotone" dataKey="avgRepsR" name="Droite" stroke="var(--sm-up)" strokeWidth={2} dot={{r:3,fill:"var(--sm-up)"}}/>
+                        </LineChart></ResponsiveContainer>
+                      </div>
+                    </div>
+                  )}
 
                   <div style={S.card}>
                     <p style={{margin:"0 0 12px",fontSize:14,fontWeight:700,color:"var(--sm-ink)"}}>Historique détaillé</p>
