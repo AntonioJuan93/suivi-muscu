@@ -887,7 +887,14 @@ export default function App() {
     setEditingProgram(null);
   }
   function deleteProgram(id){setPrograms(ps=>ps.filter(p=>p.id!==id));setConfirmDelete(null);}
-  function deleteSession(id){setSessions(ps=>ps.filter(s=>s.id!==id));setConfirmDelete(null);}
+  function deleteSession(id){
+    const newSessions=sessions.filter(s=>s.id!==id);
+    setSessions(newSessions);
+    setConfirmDelete(null);
+    const snap={sessions:newSessions,programs,customExercises,theme:darkMode?"dark":"",email:user?.email||"",draft:{}};
+    saveData(snap);
+    if(user&&cloudLoaded)saveCloud(snap);
+  }
 
   function loadProgram(p){
     setSelectedProgram(p);
