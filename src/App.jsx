@@ -1002,12 +1002,21 @@ export default function App() {
   // ── Computed ──────────────────────────────────────────────────────────────
   const progressEx=progressKey?progressKey.split(":::")[0]:"";
   const progressUnilateral=!!(progressKey?.includes(":::unil"));
-  const progressEquip=(()=>{const p=progressKey?.split(":::")||[];return p.length>1&&p[1]!=="unil"?p[1]:"";})();
 
   const allExVariants=useMemo(()=>{
     const seen=new Set(),result=[];
     sessions.forEach(s=>s.exercises.forEach(e=>{const k=exKey(e.name,e.equipment||"",null,e.unilateral);if(!seen.has(k)){seen.add(k);result.push({name:e.name,equipment:e.equipment||"",unilateral:!!e.unilateral,key:k});}}));
     return result.sort((a,b)=>a.name.localeCompare(b.name)||a.equipment.localeCompare(b.equipment));
+  },[sessions]);
+
+  const progressVariants=useMemo(()=>{
+    const seen=new Set(),result=[];
+    sessions.forEach(s=>s.exercises.forEach(e=>{
+      if(/unilatér|unilateral/i.test(e.name))return;
+      const k=e.name+(e.unilateral?":::unil":"");
+      if(!seen.has(k)){seen.add(k);result.push({name:e.name,unilateral:!!e.unilateral,key:k});}
+    }));
+    return result.sort((a,b)=>a.name.localeCompare(b.name)||(a.unilateral?1:-1));
   },[sessions]);
 
   const now=new Date(),weekStart=startOfWeek(now);
@@ -1023,7 +1032,7 @@ export default function App() {
   },[sessions]);
 
   const progressData=useMemo(()=>
-    sessions.flatMap(s=>s.exercises.filter(e=>e.name===progressEx&&(e.equipment||"")===(progressEquip||"")&&!!e.unilateral===progressUnilateral).map(e=>{
+    sessions.flatMap(s=>s.exercises.filter(e=>e.name===progressEx&&!!e.unilateral===progressUnilateral&&!/unilatér|unilateral/i.test(e.name)).map(e=>{
       const working=(e.sets||[]).filter(st=>!st.isWarmup);
       const withRPE=working.filter(st=>st.rpe);
       const avgRPE=withRPE.length?Math.round(withRPE.reduce((a,st)=>a+(parseFloat(st.rpe)||0),0)/withRPE.length*10)/10:null;
@@ -1646,7 +1655,7 @@ export default function App() {
               <MonoLabel>Exercice à analyser</MonoLabel>
               <select value={progressKey} onChange={e=>setProgressKey(e.target.value)} style={S.inp}>
                 <option value="">-- Choisir un exercice --</option>
-                {allExVariants.filter(v=>!/unilatér|unilateral/i.test(v.name)).map(v=><option key={v.key} value={v.key}>{v.name}{v.equipment?` — ${equipLabel(v.equipment)}`:""}{v.unilateral?" (Unilatéral)":""}</option>)}
+                {progressVariants.map(v=><option key={v.key} value={v.key}>{v.name}{v.unilateral?" (Unilatéral)":""}</option>)}
               </select>
             </div>
 
