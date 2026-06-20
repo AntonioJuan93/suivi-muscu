@@ -1034,11 +1034,9 @@ export default function App() {
   const progressData=useMemo(()=>
     sessions.flatMap(s=>s.exercises.filter(e=>e.name===progressEx&&!!e.unilateral===progressUnilateral&&!/unilatér|unilateral/i.test(e.name)).map(e=>{
       const working=(e.sets||[]).filter(st=>!st.isWarmup);
-      const withRPE=working.filter(st=>st.rpe);
-      const avgRPE=withRPE.length?Math.round(withRPE.reduce((a,st)=>a+(parseFloat(st.rpe)||0),0)/withRPE.length*10)/10:null;
       const avgRepsL=working.length?Math.round(working.reduce((a,st)=>a+(parseInt(st.repsL)||0),0)/working.length*10)/10:0;
       const avgRepsR=working.length?Math.round(working.reduce((a,st)=>a+(parseInt(st.repsR)||0),0)/working.length*10)/10:0;
-      return{date:s.date,label:formatDate(s.date),maxWeight:Math.max(0,...working.map(st=>parseFloat(st.weight)||0)),volume:wVolume(e.sets),orm:Math.max(0,...working.map(st=>estimate1RM(st.weight,st.reps))),rating:s.rating,avgRPE,avgRepsL,avgRepsR};
+      return{date:s.date,label:formatDate(s.date),maxWeight:Math.max(0,...working.map(st=>parseFloat(st.weight)||0)),volume:wVolume(e.sets),rating:s.rating,avgRepsL,avgRepsR};
     })).sort((a,b)=>a.date.localeCompare(b.date))
   ,[sessions,progressKey,progressEx,progressUnilateral]);
 
@@ -1660,20 +1658,19 @@ export default function App() {
             </div>
 
             {progressEx&&progressData.length>0&&(()=>{
-              const best=progressData.reduce((b,d)=>d.orm>b.orm?d:b,progressData[0]);
               const last=progressData[progressData.length-1];
               const prev=progressData.length>=2?progressData[progressData.length-2]:null;
               const diff=prev?(last.maxWeight-prev.maxWeight):null;
+              const record=Math.max(...progressData.map(d=>d.maxWeight));
               return(
                 <>
                   <div style={{...S.card,marginBottom:12}}>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:0}}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
                       {[
-                        {label:"Record",value:`${Math.max(...progressData.map(d=>d.maxWeight))} kg`,sub:formatDate(best.date)},
-                        {label:"1RM estimé",value:`${Math.max(...progressData.map(d=>d.orm))} kg`,sub:"Brzycki"},
+                        {label:"Record",value:`${record} kg`},
                         {label:"vs. dernière",value:diff===null?"—":diff>=0?`+${diff} kg`:`${diff} kg`,sub:prev?formatDate(prev.date):"",accent:diff===null?"var(--sm-sub)":diff>0?"var(--sm-up)":diff<0?"#e05555":"var(--sm-sub)"},
                       ].map(({label,value,sub,accent},i)=>(
-                        <div key={i} style={{textAlign:"center",padding:"8px 0",borderRight:i<2?"1px solid var(--sm-line)":"none"}}>
+                        <div key={i} style={{textAlign:"center",padding:"8px 0",borderRight:i<1?"1px solid var(--sm-line)":"none"}}>
                           <div style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",letterSpacing:".12em",textTransform:"uppercase",marginBottom:6}}>{label}</div>
                           <div style={{fontFamily:"var(--sm-font-disp)",fontSize:22,color:accent||"var(--sm-accent)",letterSpacing:"-.01em"}}>{value}</div>
                           {sub&&<div style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",marginTop:2}}>{sub}</div>}
@@ -1683,25 +1680,42 @@ export default function App() {
                   </div>
 
                   <div style={S.card}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                      <p style={{margin:0,fontSize:14,fontWeight:700,color:"var(--sm-ink)"}}>Évolution du poids</p>
-                    </div>
-                    <div style={{width:"100%",height:220}}>
+                    <p style={{margin:"0 0 10px",fontSize:14,fontWeight:700,color:"var(--sm-ink)"}}>Évolution du poids</p>
+                    <div style={{width:"100%",height:200}}>
                       <ResponsiveContainer><LineChart data={progressData} margin={{top:5,right:10,left:-10,bottom:0}}>
                         <CartesianGrid strokeDasharray="3 3" stroke="var(--sm-line)"/>
                         <XAxis dataKey="label" tick={{fontSize:10,fill:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)"}} stroke="var(--sm-line)"/>
                         <YAxis tick={{fontSize:11,fill:"var(--sm-sub)"}} stroke="var(--sm-line)"/>
-                        <Tooltip contentStyle={{background:"var(--sm-card)",border:"1px solid var(--sm-line)",borderRadius:14,fontSize:12,color:"var(--sm-ink)"}}
-                          formatter={(val,name,{payload})=>[`${val} kg${name==="Poids max"&&payload.avgRPE?` (RPE ${payload.avgRPE})`:""}`,name]}/>
-                        <Line type="monotone" dataKey="maxWeight" name="Poids max" stroke="var(--sm-accent)" strokeWidth={2.5}
+                        <Tooltip contentStyle={{background:"var(--sm-card)",border:"1px solid var(--sm-line)",borderRadius:14,fontSize:12,color:"var(--sm-ink)"}} formatter={val=>[`${val} kg`,"Poids"]}/>
+                        <Line type="monotone" dataKey="maxWeight" name="Poids" stroke="var(--sm-accent)" strokeWidth={2.5}
                           dot={(props)=>{const{cx,cy,payload}=props;const r=payload.rating;const fill=r?ratingColors[r-1]:"var(--sm-accent)";return<circle key={`d${props.index}`} cx={cx} cy={cy} r={5} fill={fill} stroke="var(--sm-card)" strokeWidth={2}/>;}}/>
-                        <Line type="monotone" dataKey="orm" name="1RM estimé" stroke="var(--sm-up)" strokeWidth={1.5} strokeDasharray="5 3" dot={{r:2,fill:"var(--sm-up)"}}/>
                       </LineChart></ResponsiveContainer>
                     </div>
                     <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
                       {[1,2,3,4,5].map(n=><span key={n} style={{fontFamily:"var(--sm-font-mono)",fontSize:9,color:"var(--sm-sub)",display:"flex",alignItems:"center",gap:3,letterSpacing:".06em"}}><span style={{display:"inline-block",width:8,height:8,borderRadius:"50%",background:ratingColors[n-1]}}></span>{ratingLabels[n-1]}</span>)}
                     </div>
                   </div>
+
+                  {progressUnilateral&&progressData.some(d=>d.avgRepsL>0||d.avgRepsR>0)&&(
+                    <div style={S.card}>
+                      <p style={{margin:"0 0 4px",fontSize:14,fontWeight:700,color:"var(--sm-ink)"}}>Reps par côté</p>
+                      <p style={{margin:"0 0 10px",fontSize:11,color:"var(--sm-sub)",fontFamily:"var(--sm-font-serif)",fontStyle:"italic"}}>Moyenne de reps par série</p>
+                      <div style={{display:"flex",gap:14,marginBottom:10}}>
+                        <span style={{fontFamily:"var(--sm-font-mono)",fontSize:10,color:"var(--sm-sub)",display:"flex",alignItems:"center",gap:5}}><span style={{display:"inline-block",width:10,height:3,background:"var(--sm-accent)",borderRadius:2}}/> Gauche</span>
+                        <span style={{fontFamily:"var(--sm-font-mono)",fontSize:10,color:"var(--sm-sub)",display:"flex",alignItems:"center",gap:5}}><span style={{display:"inline-block",width:10,height:3,background:"var(--sm-up)",borderRadius:2}}/> Droite</span>
+                      </div>
+                      <div style={{width:"100%",height:180}}>
+                        <ResponsiveContainer><LineChart data={progressData} margin={{top:5,right:10,left:-10,bottom:0}}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--sm-line)"/>
+                          <XAxis dataKey="label" tick={{fontSize:10,fill:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)"}} stroke="var(--sm-line)"/>
+                          <YAxis tick={{fontSize:11,fill:"var(--sm-sub)"}} stroke="var(--sm-line)"/>
+                          <Tooltip contentStyle={{background:"var(--sm-card)",border:"1px solid var(--sm-line)",borderRadius:14,fontSize:12,color:"var(--sm-ink)"}} formatter={(v,n)=>[`${v} reps`,n==="avgRepsL"?"Gauche":"Droite"]}/>
+                          <Line type="monotone" dataKey="avgRepsL" stroke="var(--sm-accent)" strokeWidth={2} dot={{r:3,fill:"var(--sm-accent)"}}/>
+                          <Line type="monotone" dataKey="avgRepsR" stroke="var(--sm-up)" strokeWidth={2} dot={{r:3,fill:"var(--sm-up)"}}/>
+                        </LineChart></ResponsiveContainer>
+                      </div>
+                    </div>
+                  )}
 
                   <div style={S.card}>
                     <p style={{margin:"0 0 12px",fontSize:14,fontWeight:700,color:"var(--sm-ink)"}}>Volume par séance</p>
@@ -1718,21 +1732,18 @@ export default function App() {
                     </div>
                   </div>
 
-
                   <div style={S.card}>
                     <p style={{margin:"0 0 12px",fontSize:14,fontWeight:700,color:"var(--sm-ink)"}}>Historique détaillé</p>
                     <div style={{overflowX:"auto"}}>
-                      <table style={{width:"100%",fontSize:12,borderCollapse:"collapse",minWidth:360}}>
+                      <table style={{width:"100%",fontSize:12,borderCollapse:"collapse",minWidth:280}}>
                         <thead><tr style={{borderBottom:"1px solid var(--sm-line)"}}>
-                          {["Date","Poids","Volume","1RM","RPE","Forme"].map(h=><th key={h} style={{textAlign:"left",padding:"4px 8px",color:"var(--sm-sub)",fontWeight:400,whiteSpace:"nowrap",fontFamily:"var(--sm-font-mono)",fontSize:10,letterSpacing:".08em",textTransform:"uppercase"}}>{h}</th>)}
+                          {["Date","Poids","Volume","Forme"].map(h=><th key={h} style={{textAlign:"left",padding:"4px 8px",color:"var(--sm-sub)",fontWeight:400,whiteSpace:"nowrap",fontFamily:"var(--sm-font-mono)",fontSize:10,letterSpacing:".08em",textTransform:"uppercase"}}>{h}</th>)}
                         </tr></thead>
                         <tbody>{[...progressData].reverse().map((d,i)=>(
                           <tr key={i} style={{borderBottom:"1px solid var(--sm-line)"}}>
                             <td style={{padding:"7px 8px",color:"var(--sm-ink)",fontFamily:"var(--sm-font-mono)",fontSize:11}}>{formatDate(d.date)}</td>
                             <td style={{padding:"7px 8px",fontFamily:"var(--sm-font-disp)",fontSize:16,color:"var(--sm-accent)"}}>{d.maxWeight}</td>
                             <td style={{padding:"7px 8px",color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",fontSize:11}}>{Math.round(d.volume)}kg</td>
-                            <td style={{padding:"7px 8px",color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",fontSize:11}}>{d.orm}kg</td>
-                            <td style={{padding:"7px 8px",color:"var(--sm-sub)",fontFamily:"var(--sm-font-mono)",fontSize:11}}>{d.avgRPE||"—"}</td>
                             <td style={{padding:"7px 8px"}}>{d.rating?<span style={{color:ratingColors[d.rating-1],fontWeight:600,fontSize:11}}>{ratingLabels[d.rating-1]}</span>:"—"}</td>
                           </tr>
                         ))}</tbody>
