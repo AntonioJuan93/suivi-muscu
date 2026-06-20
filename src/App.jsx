@@ -891,7 +891,7 @@ export default function App() {
     const newSessions=sessions.filter(s=>s.id!==id);
     setSessions(newSessions);
     setConfirmDelete(null);
-    const snap={sessions:newSessions,programs,customExercises,theme:darkMode?"dark":"",email:user?.email||"",draft:{}};
+    const snap={...fullData(),sessions:newSessions};
     saveData(snap);
     if(user&&cloudLoaded)saveCloud(snap);
   }
