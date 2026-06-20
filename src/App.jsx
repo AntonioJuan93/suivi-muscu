@@ -816,9 +816,17 @@ export default function App() {
     if(!d){setPartnerError("Aucun utilisateur trouvé avec cet email.");return;}
     setPartnerData(d);setTab("partner");
   }
+  function migrateSessions(list){
+    return(list||[]).map(s=>({...s,exercises:s.exercises.map(e=>e.name==="Reverse fly (unilatérale)"?{...e,name:"Reverse fly",unilateral:true}:e)}));
+  }
   function applyData(d,withDraft){
     if(!d)return;
-    if(d.sessions)setSessions(d.sessions.map(s=>({...s,exercises:s.exercises.map(e=>e.name==="Reverse fly (unilatérale)"?{...e,name:"Reverse fly",unilateral:true}:e)})));
+    if(d.sessions)setSessions(prev=>{
+      const migrated=migrateSessions(d.sessions);
+      const cloudIds=new Set(migrated.map(s=>s.id));
+      const localOnly=prev.filter(s=>!cloudIds.has(s.id));
+      return[...localOnly,...migrated].sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+    });
     if(d.programs)setPrograms(d.programs);
     if(d.customExercises)setCustomExercises(d.customExercises);
     if(d.theme==="dark")setDarkMode(true);
@@ -961,9 +969,15 @@ export default function App() {
 
   function saveSession(){
     if(!exercises.length)return;
-    const clean=exercises.map(e=>({...e,sets:e.sets.filter(s=>s.weight||s.reps)})).filter(e=>e.sets.length);
+    const clean=exercises.map(e=>({...e,sets:e.sets.filter(s=>s.weight||s.reps||s.repsL||s.repsR)})).filter(e=>e.sets.length);
     if(!clean.length)return;
-    setSessions(s=>[{id:Date.now(),date:sessionDate,duration:parseInt(sessionDuration)||null,notes:sessionNotes.trim()||null,programName:selectedProgram?.name||"Séance libre",exercises:clean,bodyweight:parseFloat(sessionBodyweight)||null,rating:sessionRating,sleep:sessionSleep,energy:sessionEnergy},...s]);
+    const newSession={id:Date.now(),date:sessionDate,duration:parseInt(sessionDuration)||null,notes:sessionNotes.trim()||null,programName:selectedProgram?.name||"Séance libre",exercises:clean,bodyweight:parseFloat(sessionBodyweight)||null,rating:sessionRating,sleep:sessionSleep,energy:sessionEnergy};
+    const newSessions=[newSession,...sessions];
+    setSessions(newSessions);
+    // Sauvegarde immédiate sans attendre le debounce
+    const snap={sessions:newSessions,programs,customExercises,theme:darkMode?"dark":"",email:user?.email||"",draft:{}};
+    saveData(snap);
+    if(user&&cloudLoaded)saveCloud(snap);
     resetDraft();setMode("free");setTab("history");
   }
 
